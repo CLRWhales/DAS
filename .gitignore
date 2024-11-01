@@ -2,7 +2,7 @@
 venv/
 
 #ignore potential ini files
-.ini
+*.ini
 
 #ignore pycache
 __pycache__/
