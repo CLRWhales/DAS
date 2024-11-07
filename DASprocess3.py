@@ -18,7 +18,7 @@ from DASFFT import sneakyfft
 #data info:
 path_data = 'D:/DAS/tmpData8m/'
 nfiles = 5
-
+ 
 #processing info:
 n_synthetic = 130 #how many synthetic receivers to you want 
 synthetic_spacing = 250 #channels between synthetic recievers (where channelspacing is half the guage length)
