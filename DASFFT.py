@@ -4,6 +4,22 @@ import numpy as np; import time
 
 #build in a flag that toggles the zero padding on and off.
 def reshape_array_with_overlap(arr, N, N_overlap):
+    """ reshapes a typical das array with overlap so that fft can be applied efficiently.
+
+    Parameters
+    ----------
+    arr : 2d np.array
+        2d data array.
+    N : int
+        number samples in a section
+    N_overlap : int
+        number of samples to overlap.
+
+    Returns
+    -------
+    reshaped_arr : 2d np.array
+        data array sliced to be able to apply windowing and fft very quickly along 0th axis.
+    """
     rows, cols = arr.shape
     
     # Validate that overlap doesn't exceed block size
@@ -34,10 +50,33 @@ def reshape_array_with_overlap(arr, N, N_overlap):
     return reshaped_arr
 
 
-#X: preprocessed np array of Das Data in the TX domain. must be of dimentsion time, channels
+def sneakyfft(X,N_samp,N_overlap,N_FFT, window,fs):
+    """ computes multi channel spectrogram very fast.
 
+    Parameters
+    ----------
+    X : 2d np.array
+        2d data array. (time, channel)
+    N_samp : int
+        number samples in a spectrogram frame
+    N_overlap : int
+        number of samples to overlap for each frame.
+    N_FFT : int
+        fft size (samples) to zero pad to.
+    Window : np.array
+        the output of np window function or equivalent, must be same lenth as N_samp for broadcasting
+    fs : int
+        sample rate (Hz) of the das data series'
 
-def sneakyfft(X,N_samp,N_overlap,N_FFT, window):
+    Returns
+    -------
+    spec : 3d np.array, complex
+        stack of spectrograms for each channel included in the input X, dimension of freq, time, channel 
+    f : np.array
+        vector of frequencies of the spectrogram array
+    t: np.arry
+        vector of relative times of the time bins of the spectrogram.
+    """
     if N_overlap >= N_samp:
         raise ValueError("Overlap cannot be greater than or equal to the block size.")
     
@@ -49,9 +88,12 @@ def sneakyfft(X,N_samp,N_overlap,N_FFT, window):
     fft_out = np.fft.rfft(reshaped, n = N_FFT, axis =0)
    
     nt_slices = fft_out.shape[1]//X.shape[1]
-    output = fft_out.reshape(fft_out.shape[0],nt_slices,X.shape[1])
+    spec = fft_out.reshape(fft_out.shape[0],nt_slices,X.shape[1])
+    f = fs/N_FFT*np.arange(fs+1)
+    t = np.arange(nt_slices)*(N_overlap/N_samp)
 
-    return output 
+
+    return spec, f, t
 
 
 

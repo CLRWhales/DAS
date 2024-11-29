@@ -1,17 +1,20 @@
-#this script experiments with the config parser function to ty and build batch run style scripts
+#this script writes a generic with the config parser function to ty and build batch run style scripts
 
 #%%
 import configparser
 
 config = configparser.ConfigParser()
-config['Data'] = {'Directory':'C:/Users/calderr/Downloads/tempData/',
-                  'Start_DT':'2024-03-01 02:02:02',
-                  'End_DT': '2024-04-01 02:02:02',
-                  'FilesPerChunk': '5'}
-config['ProcessingInfo'] = {'DetectorSpacing_ch':'250',
-                            'N_ChannelStack':'10',
-                            'fsTarget':'256',
-                            'NFFT' : '512'}
+config['DataInfo'] = {'Directory':'D:/DAS/tmpData8m/',
+                  'n_files':'5'}
+config['ProcessingInfo'] = {'n_synthetic':'130',
+                            'synthetic_spacing':'250',
+                            'n_stack':'5',
+                            'fs_target' : '256'
+                            }
+config['FFTInfo'] = {'N_fft':'512',
+                     'n_overlap':'64',
+                     'n_samp':'128'}
+config['SaveInfo'] = {'plot_directory':'C:/Users/Calder/Ouputs/DASplots1/'}
 
 with open('example.ini', 'w') as configfile:
   config.write(configfile)
