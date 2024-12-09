@@ -43,7 +43,6 @@ fileIDs = fileIDs[0:nfiles]
 
 #find channels
 channels = []
-
 for i in range(int(config['ProcessingInfo']['n_synthetic'])):
     channels.extend([x+i*int(config['ProcessingInfo']['synthetic_spacing']) for x in range(0,int(config['ProcessingInfo']['n_stack']))])
 
@@ -81,6 +80,11 @@ window = np.hamming(N_samp)
 spec, freqs, times = sneakyfft(data,N_samp,N_overlap,N_fft, window,fs_target)
 
 t_ex_end=time.perf_counter(); print(f'sneakyfft_time: {t_ex_end-t_ex_start}s'); 
+
+
+#coherent stacking
+n_synthetic = int(config['ProcessingInfo']['n_synthetic'])
+n_stack = int(config['ProcessingInfo']['n_stack'])
 
 
 fftout = abs(spec)
