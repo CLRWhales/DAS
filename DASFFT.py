@@ -50,7 +50,7 @@ def reshape_array_with_overlap(arr, N, N_overlap):
     return reshaped_arr
 
 
-def sneakyfft(X,N_samp,N_overlap,N_FFT, window,fs):
+def sneakyfft(X,N_samp,N_overlap,N_fft, window,fs):
     """ computes multi channel spectrogram very fast.
 
     Parameters
@@ -61,7 +61,7 @@ def sneakyfft(X,N_samp,N_overlap,N_FFT, window,fs):
         number samples in a spectrogram frame
     N_overlap : int
         number of samples to overlap for each frame.
-    N_FFT : int
+    N_fft : int
         fft size (samples) to zero pad to.
     Window : np.array
         the output of np window function or equivalent, must be same lenth as N_samp for broadcasting
@@ -85,11 +85,12 @@ def sneakyfft(X,N_samp,N_overlap,N_FFT, window,fs):
     
     reshaped = reshape_array_with_overlap(X,N_samp,N_overlap)
     reshaped = reshaped * window[:,None]
-    fft_out = np.fft.rfft(reshaped, n = N_FFT, axis =0)
+    fft_out = np.fft.rfft(reshaped, n = N_fft, axis =0)
    
     nt_slices = fft_out.shape[1]//X.shape[1]
     spec = fft_out.reshape(fft_out.shape[0],nt_slices,X.shape[1])
-    f = fs/N_FFT*np.arange(fs+1)
+    #f = fs/N_FFT*np.arange(fs+1)
+    f = np.fft.rfftfreq(N_fft,1/fs)
     t = np.arange(nt_slices)*(N_overlap/N_samp)
 
 
