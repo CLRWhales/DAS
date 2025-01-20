@@ -15,6 +15,8 @@ import argparse
 import Calder_utils
 import math
 import datetime
+from concurrent.futures import ThreadPoolExecutor ,ProcessPoolExecutor
+
 # prepping and reading the ini file
 # parser = argparse.ArgumentParser()
 # parser.add_argument("iniPath",help = 'path to to the ini file')
@@ -25,23 +27,24 @@ config_name = 'example.ini'
 config = configparser.ConfigParser()
 config.read(filenames=config_name)
 
+#setup
 
-#find files
 filepaths = sorted( glob.glob(config['DataInfo']['Directory'] + '*.hdf5') )
 files = [f.split('\\')[-1] for f in filepaths]; 
 fileIDs = [int(item.split('.')[0]) for item in files]
 
-#trim to time of interest
-starttime = int(config['ProcessingInfo']['startime'])
-stoptime = int(config['ProcessingInfo']['stoptime'])
-fileIDs = fileIDs[fileIDs>=starttime and fileIDs <=stoptime]
+if len(config['ProcessingInfo']['starttime'])>0:
+    starttime = int(config['ProcessingInfo']['starttime'])
+    stoptime = int(config['ProcessingInfo']['stoptime'])
+    fileIDs = [i for i in fileIDs if i >= starttime and i <= stoptime]
 
+n_files = int(config['DataInfo']['n_files'])
+chunks = [fileIDs[x:x+n_files] for x in range(0, len(fileIDs), n_files)]
 
 if len(fileIDs)<int(config['DataInfo']['n_files']):
     nfiles = len(fileIDs)
 else: 
     nfiles = int(config['DataInfo']['n_files'])
-
 
 
 fileIDs = fileIDs[0:nfiles]
@@ -51,7 +54,7 @@ channels = []
 for i in range(int(config['ProcessingInfo']['n_synthetic'])):
     channels.extend([x+i*int(config['ProcessingInfo']['synthetic_spacing']) for x in range(0,int(config['ProcessingInfo']['n_stack']))])
 
-#load data + pre process
+#batch load, process, save spec
 t_ex_start=time.perf_counter()  
 
 data_raw, meta = load_multiple_DAS_files(config['DataInfo']['directory'], fileIDs, chIndex=channels, roiIndex=None,
@@ -133,19 +136,27 @@ if savetype == 'fast':
     plt.figure(figsize=(8, 8))
     plt.imshow(norm, origin='lower', extent=(min(channels),max(channels),min(freqs),max(freqs)), aspect = 'auto')
     plt.colorbar()
+
 elif savetype == 'magnitude':
     #do something else
     magspec = 10*np.log10(abs(spec))
     date = meta['header']['time']
     fdate = datetime.datetime.fromtimestamp(int(date),tz = datetime.timezone.utc).strftime('%Y%m%dT%H%M%S')
-    data_name = config['SaveInfo']['data_directory'] + '/' + fdate
+    data_name = config['SaveInfo']['data_directory'] + '/FTX' + str(fs_target) + '_' + fdate +'Z'
     np.save(data_name,magspec)
 
+    freqname = config['SaveInfo']['data_directory'] + '/Dim_Frequency'
+    np.savetxt(freqname,freqs)
 
-    frequencies = freqs
     c_idx = channels
     channeldistance = meta['header']['channels'][c_idx]
-    
+    channelname= config['SaveInfo']['data_directory'] + '/Dim_Channel'
+    np.savetxt(channelname,channeldistance)
+
+    timename = config['SaveInfo']['data_directory'] + '/Dim_Time'
+    np.savetxt(timename,times)
+
+
 
 
 
