@@ -1,8 +1,6 @@
 #this script contains the helper functions developed by calder robinson
-
+#%%
 import numpy as np
-import configparser
-
 
 def faststack(X,n, wind = 1):
      """ fast adjacent channel stack through time
@@ -34,19 +32,17 @@ def faststack(X,n, wind = 1):
          
 
      if trimval!=0:
-          trimmedmean = X[:,-trimval:].average(axis = 1)
+          trimmedmean = X[:,-trimval:].mean(axis = 1)
           X = X[:,:-trimval]
-          stacked = X.reshape(-1,n).average(axis = 1, weights = wind).reshape(rows,-1)
+          stacked = X.reshape(-1,n)
+          stacked = np.average(stacked, axis = 1, weights = wind).reshape(rows,-1)
           stacked = np.c_[stacked,trimmedmean]
      else:
-          stacked = X.reshape(-1,n).mean(axis = 1).reshape(rows,-1)
+          stacked = X.reshape(-1,n)
+          stacked = np.average(stacked, axis = 1, weights=wind).reshape(rows,-1)
 
      return stacked
 
-def loadparams(X):
-    config = configparser.ConfigParser()
-    config.read(filenames=X)
-    #perform some io logic to get stuff set up for the run then return the io logic
 
-    
-    return config
+
+

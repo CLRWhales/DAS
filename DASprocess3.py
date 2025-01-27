@@ -15,7 +15,7 @@ import argparse
 import Calder_utils
 import math
 import datetime
-from concurrent.futures import ThreadPoolExecutor ,ProcessPoolExecutor
+from load_DAS_conc import load_files
 
 # prepping and reading the ini file
 # parser = argparse.ArgumentParser()
@@ -41,13 +41,13 @@ if len(config['ProcessingInfo']['starttime'])>0:
 n_files = int(config['DataInfo']['n_files'])
 chunks = [fileIDs[x:x+n_files] for x in range(0, len(fileIDs), n_files)]
 
-if len(fileIDs)<int(config['DataInfo']['n_files']):
-    nfiles = len(fileIDs)
-else: 
-    nfiles = int(config['DataInfo']['n_files'])
+# if len(fileIDs)<int(config['DataInfo']['n_files']):
+#     nfiles = len(fileIDs)
+# else: 
+#     nfiles = int(config['DataInfo']['n_files'])
 
 
-fileIDs = fileIDs[0:nfiles]
+# fileIDs = fileIDs[0:nfiles]
 
 #find channels
 channels = []
@@ -57,104 +57,119 @@ for i in range(int(config['ProcessingInfo']['n_synthetic'])):
 #batch load, process, save spec
 t_ex_start=time.perf_counter()  
 
-data_raw, meta = load_multiple_DAS_files(config['DataInfo']['directory'], fileIDs, chIndex=channels, roiIndex=None,
-                            integrate=True, unwr=True, metaDetail=1, useSensitivity=True, spikeThr=None)
+n_workers = int(config['DataInfo']['n_workers'])
 
-t_ex_end=time.perf_counter(); print(f'data loading time: {t_ex_end-t_ex_start}s'); 
-t_ex_start=time.perf_counter()  
-dt = meta['header']['dt']
 
-n_stack = int(config['ProcessingInfo']['n_stack'])
+path_data = config['DataInfo']['directory']
+verbose = True
+# ldat, lmeta, tdat= load_files(path_data, channels, verbose, fileIDs)
 
-if config['ProcessingInfo'].getboolean('stack'):
-    data = Calder_utils.faststack(data_raw,n_stack)
-    channels = np.array(channels)[np.arange(0,len(channels),n_stack)]
-else:
-    data = data_raw
+# t_ex_end=time.perf_counter(); print(f'data loading time: {t_ex_end-t_ex_start}s'); 
 
-if config['ProcessingInfo']['fs_target'] == 'auto':
-    fs_target = 2**math.floor(math.log(1/dt,2))
-else:
-    fs_target = int(config['ProcessingInfo']['fs_target'])
 
-data /= 10E-12 #scaling into units of strain is handled, this moves it to pico strain? 
-num = data.shape[0]/(1/fs_target)*dt
-num = num.astype(int)
-data = resample(data,num ,axis = 0);
-data=detrend(data, axis=0, type='linear');
+for c in range(len(chunks)):
+    tids = chunks[c]
 
-dt_new = 1/fs_target
+    data_raw, meta = load_multiple_DAS_files(config['DataInfo']['directory'], tids, chIndex=channels, roiIndex=None,
+                                integrate=True, unwr=True, metaDetail=1, useSensitivity=True, spikeThr=None)
+#%%
+    t_ex_end=time.perf_counter(); print(f'data loading time: {t_ex_end-t_ex_start}s'); 
+    t_ex_start=time.perf_counter()  
+    dt = meta['header']['dt']
 
-#filering
-cuts = [int(config['FilterInfo']['lowcut']),int(config['FilterInfo']['highcut'])]
+    n_stack = int(config['ProcessingInfo']['n_stack'])
 
-if(config['FilterInfo']['type'] == 'lowpass' or config['FilterInfo']['type'] == 'highpass'):
-    cuts = cuts[0]
+    if config['ProcessingInfo'].getboolean('stack'):
+        data = Calder_utils.faststack(data_raw,n_stack)
+        c2 = np.array(channels)[np.arange(0,len(channels),n_stack)]
+    else:
+        data = data_raw
 
-sos = butter(N = int(config['FilterInfo']['order']),
-             Wn = cuts,
-             btype = config['FilterInfo']['type'],
-             fs = fs_target,
-             output = 'sos')
+    if config['ProcessingInfo']['fs_target'] == 'auto':
+        fs_target = 2**math.floor(math.log(1/dt,2))
+    else:
+        fs_target = int(config['ProcessingInfo']['fs_target'])
 
-data = sosfiltfilt(sos = sos,
-                   x = data,
-                   axis = 0)
+    data /= 10E-12 #scaling into units of strain is handled, this moves it to pico strain? 
+    num = data.shape[0]/(1/fs_target)*dt
+    num = num.astype(int)
+    data = resample(data,num ,axis = 0)
+    data=detrend(data, axis=0, type='linear')
 
-# data = utils_tmp.bandpass_2darray(data, fs_target, bp_lowcut, bp_highcut, axis_filt=0, order=bp_order, 
-#                                       zerophase=bp_zerophase, taper_data=True, alpha_tape=alpha_taper)
+    dt_new = 1/fs_target
 
-t_ex_end=time.perf_counter(); print(f'preprocess time: {t_ex_end-t_ex_start}s');
+    #filering
+    cuts = [int(config['FilterInfo']['lowcut']),int(config['FilterInfo']['highcut'])]
 
-#compute spectrogram
-t_ex_start=time.perf_counter()  
+    if(config['FilterInfo']['type'] == 'lowpass' or config['FilterInfo']['type'] == 'highpass'):
+        cuts = cuts[0]
 
-N_samp= int(config['FFTInfo']['n_samp'])
-N_overlap = int(config['FFTInfo']['n_overlap'])
-N_fft = int(config['FFTInfo']['n_fft'])
-window = np.hamming(N_samp)
-spec, freqs, times = sneakyfft(data,N_samp,N_overlap,N_fft, window,fs_target)
+    sos = butter(N = int(config['FilterInfo']['order']),
+                Wn = cuts,
+                btype = config['FilterInfo']['type'],
+                fs = fs_target,
+                output = 'sos')
 
-t_ex_end=time.perf_counter(); print(f'sneakyfft_time: {t_ex_end-t_ex_start}s'); 
+    data = sosfiltfilt(sos = sos,
+                    x = data,
+                    axis = 0)
 
-# saving the output:
-#need to save vector F
-#need to save vector T
-#need to save vector channels
-#need to save UTC start times
-#need to save channel spacing
-#need to save complex spec?
+    # data = utils_tmp.bandpass_2darray(data, fs_target, bp_lowcut, bp_highcut, axis_filt=0, order=bp_order, 
+    #                                       zerophase=bp_zerophase, taper_data=True, alpha_tape=alpha_taper)
 
-savetype = config['SaveInfo']['data_type']
-if savetype == 'fast':
-    maxspec = np.max(abs(spec),axis = 1)
-    meanspec = np.mean(abs(spec),axis = 1)
-    sdspec = np.std(abs(spec),axis = 1)
+    t_ex_end=time.perf_counter(); print(f'preprocess time: {t_ex_end-t_ex_start}s');
 
-    norm = (maxspec-meanspec)/sdspec
+    #compute spectrogram
+    t_ex_start=time.perf_counter()  
 
-    plt.figure(figsize=(8, 8))
-    plt.imshow(norm, origin='lower', extent=(min(channels),max(channels),min(freqs),max(freqs)), aspect = 'auto')
-    plt.colorbar()
+    N_samp= int(config['FFTInfo']['n_samp'])
+    N_overlap = int(config['FFTInfo']['n_overlap'])
+    N_fft = int(config['FFTInfo']['n_fft'])
+    window = np.hamming(N_samp)
+    spec, freqs, times = sneakyfft(data,N_samp,N_overlap,N_fft, window,fs_target)
 
-elif savetype == 'magnitude':
-    #do something else
-    magspec = 10*np.log10(abs(spec))
-    date = meta['header']['time']
-    fdate = datetime.datetime.fromtimestamp(int(date),tz = datetime.timezone.utc).strftime('%Y%m%dT%H%M%S')
-    data_name = config['SaveInfo']['data_directory'] + '/FTX' + str(fs_target) + '_' + fdate +'Z'
-    np.save(data_name,magspec)
+    t_ex_end=time.perf_counter(); print(f'sneakyfft_time: {t_ex_end-t_ex_start}s'); 
 
-    freqname = config['SaveInfo']['data_directory'] + '/Dim_Frequency'
-    np.savetxt(freqname,freqs)
+    # saving the output:
+    #need to save vector F
+    #need to save vector T
+    #need to save vector channels
+    #need to save UTC start times
+    #need to save channel spacing
+    #need to save complex spec?
 
-    c_idx = channels
-    channeldistance = meta['header']['channels'][c_idx]
-    channelname= config['SaveInfo']['data_directory'] + '/Dim_Channel'
-    np.savetxt(channelname,channeldistance)
+    savetype = config['SaveInfo']['data_type']
+    if savetype == 'fast':
+        maxspec = np.max(abs(spec),axis = 1)
+        meanspec = np.mean(abs(spec),axis = 1)
+        sdspec = np.std(abs(spec),axis = 1)
 
-    timename = config['SaveInfo']['data_directory'] + '/Dim_Time'
-    np.savetxt(timename,times)
+        norm = (maxspec-meanspec)/sdspec
+
+        plt.figure(figsize=(8, 8))
+        plt.imshow(norm, origin='lower', extent=(min(c2),max(c2),min(freqs),max(freqs)), aspect = 'auto')
+        plt.colorbar()
+
+    elif savetype == 'magnitude':
+        #do something else
+        magspec = 10*np.log10(abs(spec))
+        date = meta['header']['time']
+        fdate = datetime.datetime.fromtimestamp(int(date),tz = datetime.timezone.utc).strftime('%Y%m%dT%H%M%S')
+        data_name = config['SaveInfo']['data_directory'] + '/FTX' + str(fs_target) + '_' + fdate +'Z'
+        np.save(data_name,magspec)
+
+        if c==0:
+
+            freqname = config['SaveInfo']['data_directory'] + '/Dim_Frequency.txt'
+            np.savetxt(freqname,freqs)
+
+            
+            channeldistance = meta['header']['channels'][c2]
+            channelname= config['SaveInfo']['data_directory'] + '/Dim_Channel.txt'
+            np.savetxt(channelname,channeldistance)
+
+            timename = config['SaveInfo']['data_directory'] + '/Dim_Time.txt'
+            np.savetxt(timename,times)
 
 
 
