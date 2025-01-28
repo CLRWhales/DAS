@@ -103,10 +103,11 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
 
     #do stacking
     n_stack = int(config['ProcessingInfo']['n_stack'])
-    chans = list_meta[0]['header']['channels']
+    chans = list_meta[0]['appended']['channels']
+
     if config['ProcessingInfo'].getboolean('stack'):
         data = Calder_utils.faststack(data,n_stack)
-        chIDX = np.arange(0,len(chans),n_stack)
+        chIDX = np.arange(start = 0,stop = len(chans), step = n_stack)
     else:
         chIDX = np.arange(0,len(chans))
 
@@ -149,7 +150,7 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
             spec, freqs, times = sneakyfft(data,N_samp,N_overlap,N_fft, window,fs_target)
         case 'time':
             N_samp= fs_target*int(config['FFTInfo']['n_samp'])
-            N_overlap = fs_target*int(config['FFTInfo']['n_overlap'])
+            N_overlap = N_samp*int(config['FFTInfo']['n_overlap'])
             N_fft = fs_target/int(config['FFTInfo']['n_fft'])
             window = np.hamming(N_samp)
             spec, freqs, times = sneakyfft(data,N_samp,N_overlap,N_fft, window,fs_target)
@@ -167,12 +168,16 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
         freqname = config['SaveInfo']['data_directory'] + '/Dim_Frequency.txt'
         np.savetxt(freqname,freqs)
 
-        channeldistance = list_meta[0]['header']['channels'][chIDX]
+        channeldistance = list_meta[0]['appended']['channels'][chIDX]
         channelname= config['SaveInfo']['data_directory'] + '/Dim_Channel.txt'
         np.savetxt(channelname,channeldistance)
 
         timename = config['SaveInfo']['data_directory'] + '/Dim_Time.txt'
         np.savetxt(timename,times)
+
+        cfgname = config['SaveInfo']['data_directory'] + '/config.ini'
+        with open(cfgname, 'w') as configfile:
+            config.write(configfile)
 
     match config['SaveInfo']['data_type']:
         case 'fast':
@@ -195,16 +200,12 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
             np.save(data_name,spec)
 
 def DAS_processor(X):
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("iniPath",help = 'path to to the ini file')
-    # args = parser.parse_args()
-    # X = args.iniPath
     config = configparser.ConfigParser()
     config.read(filenames=X)
 
     #setup 
     filepaths = sorted( glob.glob(config['DataInfo']['Directory'] + '*.hdf5') )
-    files = [f.split('\\')[-1] for f in filepaths]; 
+    files = [f.split('\\')[-1] for f in filepaths] 
     fileIDs = [int(item.split('.')[0]) for item in files]
 
     if len(fileIDs)== 0:
@@ -250,7 +251,7 @@ def DAS_processor(X):
             
         
 if __name__ == '__main__':
-    config_name = 'example.ini'
+    config_name = "C:/Users/Calder/Workspace/Python_Env/DAS/example.ini"
     t_ex_start=time.perf_counter()  
     DAS_processor(config_name)
     t_ex_end=time.perf_counter(); print(f'duration: {t_ex_end-t_ex_start}s'); 

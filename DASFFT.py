@@ -91,7 +91,7 @@ def sneakyfft(X,N_samp,N_overlap,N_fft, window,fs):
     spec = fft_out.reshape(fft_out.shape[0],nt_slices,X.shape[1])
     #f = fs/N_FFT*np.arange(fs+1)
     f = np.fft.rfftfreq(N_fft,1/fs)
-    t = np.arange(nt_slices)*(N_overlap/N_samp)
+    t = np.arange(nt_slices)*(N_samp-N_overlap)/fs
 
 
     return spec, f, t

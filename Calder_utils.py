@@ -43,6 +43,3 @@ def faststack(X,n, wind = 1):
 
      return stacked
 
-
-
-
