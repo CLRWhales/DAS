@@ -1,5 +1,7 @@
 #this script is the first steps into a consistent processing pipeline for bulk data runs based on an ini file io
-import sys, glob, time #,os
+#%%
+#import sys, os
+import glob,time
 import numpy as np # pandas as pd
 #import matplotlib.pyplot as plt
 from scipy.signal import detrend, resample, butter, sosfiltfilt
@@ -9,13 +11,14 @@ from simpleDASreader4 import load_DAS_file, unwrap, combine_units #nned this if 
 #from scipy.ndimage import gaussian_filter
 from DASFFT import sneakyfft
 import configparser
-import argparse
+#import argparse
 import Calder_utils
 import math
 import datetime
-#from load_DAS_conc import load_files, preprocess_DAS
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from functools import partial
+from pathlib import Path
+
 
 def load_file(channels, verbose, filepath):
     """
@@ -125,20 +128,40 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
     dt_new = 1/fs_target
 
     #filering
-    cuts = [int(config['FilterInfo']['lowcut']),int(config['FilterInfo']['highcut'])]
-    if(config['FilterInfo']['type'] == 'lowpass' or config['FilterInfo']['type'] == 'highpass'):
-        cuts = cuts[0]
-
-    sos = butter(N = int(config['FilterInfo']['order']),
-                Wn = cuts,
-                btype = config['FilterInfo']['type'],
-                fs = fs_target,
-                output = 'sos')
-
-    data = sosfiltfilt(sos = sos,
-                    x = data,
-                    axis = 0)
+    cuts = [float(config['FilterInfo']['lowcut']),float(config['FilterInfo']['highcut'])]
+    dofilt = True
     
+
+    match config['FilterInfo']['type']:
+        case 'lowpass':
+            cuts = cuts[0]
+        case 'highpass':
+            cuts = cuts[0]
+        case 'bandpass':
+            cuts = cuts
+        case 'bandstop':
+            cuts = cuts
+        case 'none':
+            dofilt = False
+        case _:
+            TypeError('input must be either "lowpass", "highpass","bandpass","bandstop", or "none')
+    
+    
+    
+    if dofilt:
+        sos = butter(N = int(config['FilterInfo']['order']),
+                    Wn = cuts,
+                    btype = config['FilterInfo']['type'],
+                    fs = fs_target,
+                    output = 'sos')
+
+        data = sosfiltfilt(sos = sos,
+                        x = data,
+                        axis = 0)
+        
+    
+         
+
 
     # STFT
     match config['FFTInfo']['input_type']:
@@ -149,55 +172,73 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
             window = np.hamming(N_samp)
             spec, freqs, times = sneakyfft(data,N_samp,N_overlap,N_fft, window,fs_target)
         case 'time':
-            N_samp= fs_target*int(config['FFTInfo']['n_samp'])
-            N_overlap = N_samp*int(config['FFTInfo']['n_overlap'])
-            N_fft = fs_target/int(config['FFTInfo']['n_fft'])
+            N_samp= int(fs_target*float(config['FFTInfo']['n_samp']))
+            N_overlap = int(N_samp*float(config['FFTInfo']['n_overlap']))
+            N_fft = int(fs_target/float(config['FFTInfo']['n_fft']))
             window = np.hamming(N_samp)
             spec, freqs, times = sneakyfft(data,N_samp,N_overlap,N_fft, window,fs_target)
+            
         case _:
-            raise TypeError('input must be either "point" or "time"')
+            raise TypeError('input must be either "point" or "time", if time, make sure divisions yield power of 2 for speed')
 
+    
     
 
     #saving info
     date = list_meta[0]['header']['time']
     fdate = datetime.datetime.fromtimestamp(int(date),tz = datetime.timezone.utc).strftime('%Y%m%dT%H%M%S')
-    data_name = config['SaveInfo']['data_directory'] + '/FTX' + str(fs_target) + '_' + fdate +'Z'
+
 
     if fileIDs[0] == config['Append']['first']:
-        freqname = config['SaveInfo']['data_directory'] + '/Dim_Frequency.txt'
+
+        freqname = config['Append']['outputdir'] + '/Dim_Frequency.txt'
         np.savetxt(freqname,freqs)
 
         channeldistance = list_meta[0]['appended']['channels'][chIDX]
-        channelname= config['SaveInfo']['data_directory'] + '/Dim_Channel.txt'
+        channelname= config['Append']['outputdir'] + '/Dim_Channel.txt'
         np.savetxt(channelname,channeldistance)
 
-        timename = config['SaveInfo']['data_directory'] + '/Dim_Time.txt'
+        timename = config['Append']['outputdir'] + '/Dim_Time.txt'
         np.savetxt(timename,times)
 
-        cfgname = config['SaveInfo']['data_directory'] + '/config.ini'
+        cfgname = config['Append']['outputdir'] + '/config.ini'
         with open(cfgname, 'w') as configfile:
             config.write(configfile)
 
-    match config['SaveInfo']['data_type']:
-        case 'fast':
-            maxspec = np.max(abs(spec),axis = 1)
-            meanspec = np.mean(abs(spec),axis = 1)
-            sdspec = np.std(abs(spec),axis = 1)
-            norm = (maxspec-meanspec)/sdspec
-
-            # plt.figure(figsize=(8, 8))
-            # plt.imshow(norm, origin='lower', extent=(min(c2),max(c2),min(freqs),max(freqs)), aspect = 'auto')
-            # plt.colorbar()
         
+    match config['SaveInfo']['data_type']: 
         case 'magnitude':
-            #print('mag')
+            magdir = config['Append']['outputdir'] + '/Magnitude'
+            Path(magdir).mkdir(exist_ok=True)
             spec = 10*np.log10(abs(spec))
+            data_name = magdir + '/FTX' + str(fs_target) + '_' + fdate +'Z'
             np.save(data_name,spec)
+
+            
         case 'complex':
             #print('complex')
+            compdir = config['Append']['outputdir'] + '/Complex'
+            Path(compdir).mkdir(exist_ok=True)
             spec = 10*np.log10(spec)
+            data_name = compdir + '/FTX' + str(fs_target) + '_' + fdate +'Z'
             np.save(data_name,spec)
+
+        case 'cleaning':
+            #these thresholds are based on Robins values.
+            mfreq = np.max(freqs)
+            cuts = [0.5,5,30,130,mfreq+1] 
+            for (l,h) in zip(cuts[:-1],cuts[1:]):
+                if l > mfreq:
+                    break
+                f_idx = np.where(np.logical_and(freqs >= l,freqs <= h))
+                TX = 10*np.log10(np.mean(abs(spec[f_idx[0],:,:]),axis = 0))
+                cleandir = config['Append']['outputdir'] + '/' + str(l) + 'Hz_' + str(h) + 'Hz'
+                Path(cleandir).mkdir(exist_ok=True)
+                fname = cleandir + '/TX' + str(fs_target) + '_' + fdate +'Z'
+                np.save(fname,TX)
+            
+        case _:
+            raise TypeError('input must be either "magnitude", "complex","cleaning" ')
 
 def DAS_processor(X):
     config = configparser.ConfigParser()
@@ -216,34 +257,62 @@ def DAS_processor(X):
         starttime = int(config['ProcessingInfo']['starttime'])
         stoptime = int(config['ProcessingInfo']['stoptime'])
         fileIDs = [i for i in fileIDs if i >= starttime and i <= stoptime]
+        if len(fileIDs) == 0:
+            raise ValueError("time snippet requested does not exist in File list, check if correct")
 
     if type(fileIDs[0]) == int: 
             fileIDs = ['{:06d}'.format(fid) for fid in fileIDs]  
     fileIDs_int = np.array(fileIDs, dtype=np.int32)
     assert fileIDs_int[0] == fileIDs_int.min() and fileIDs_int[-1] == fileIDs_int.max()
 
-    config['Append'] = {'first':fileIDs[0]}
-
     n_files = int(config['DataInfo']['n_files'])
     list_fids = [fileIDs[x:x+n_files] for x in range(0, len(fileIDs), n_files)]
 
     #find channels
+    firstfile = config['DataInfo']['directory'] + fileIDs[0] + '.hdf5'
     channels = []
-    if int(config['ProcessingInfo']['n_synthetic']) == -1:
-        channels = None
-    else:
-        for i in range(int(config['ProcessingInfo']['n_synthetic'])):
-            channels.extend([x+i*int(config['ProcessingInfo']['synthetic_spacing']) for x in range(0,int(config['ProcessingInfo']['n_stack']))])
+    meta = Calder_utils.load_meta(firstfile)
+    chans = meta['header']['channels']
+    match config['ProcessingInfo']['n_synthetic']:
+        case '-1':
+            channels = None
+
+        case 'auto':
+            spacing = int(config['ProcessingInfo']['synthetic_spacing'])
+            nstack = int(config['ProcessingInfo']['n_stack'])
+            
+            n_synthetic = np.floor(len(chans)/spacing)
+            n_synthetic = int(n_synthetic)
+            for i in range(n_synthetic):
+                channels.extend([x+i*int(config['ProcessingInfo']['synthetic_spacing']) for x in range(0,int(config['ProcessingInfo']['n_stack']))])
+            channels[:] = [x for x in channels if x <= np.max(chans)]
+
+        case _:
+            for i in range(int(config['ProcessingInfo']['n_synthetic'])):
+                channels.extend([x+i*int(config['ProcessingInfo']['synthetic_spacing']) for x in range(0,int(config['ProcessingInfo']['n_stack']))])
+            channels[:] = [x for x in channels if x <= np.max(chans)]
 
 
     n_workers = int(config['DataInfo']['n_workers'])
-    path_data = config['DataInfo']['directory']
     verbose = config['ProcessingInfo'].getboolean('verbose')
+    path_data = config['DataInfo']['directory'] 
+
+    #making the output directory
+    tnow = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
+    outputdir = config['SaveInfo']['directory']+config['SaveInfo']['run_name']+tnow
+    Path(outputdir).mkdir()
+    
+    config['Append'] = {'first':fileIDs[0],
+                        'outputdir':outputdir}
+
+
+
 
     if verbose:
         print(path_data)
-        print(list_fids)
+        print(outputdir)
         print(channels) 
+
 
     with ProcessPoolExecutor(max_workers= n_workers) as executor:
         executor.map(partial(LPS_block, path_data,channels,verbose, config), list_fids)
@@ -257,3 +326,5 @@ if __name__ == '__main__':
     t_ex_end=time.perf_counter(); print(f'duration: {t_ex_end-t_ex_start}s'); 
 
 
+
+# %%

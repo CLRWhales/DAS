@@ -1,43 +1,27 @@
 #this script works on the visualization of the processed data from DASprocess
 #%%
 import pyvista as pv
-import glob
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal as sig
-
+from Calder_utils import loadFTX
+import time
 
 
 directory = 'C:/Users/Calder/Outputs/DASdata2/'
+t_ex_start=time.perf_counter()  
+spec,freqs,times,channels = loadFTX(directory= directory,
+                                    nworkers= 10)
+t_ex_end=time.perf_counter(); print(f'duration: {t_ex_end-t_ex_start}s'); 
+
+#%%%
 
 
-clist = directory + '/Dim_Channel.txt'
-flist = directory + '/Dim_Frequency.txt'
-tlist = directory + '/Dim_Time.txt'
-
-filepaths = sorted( glob.glob(directory + '*.npy') )[0:10]
-
-channels = np.loadtxt(clist)
-freqs = np.loadtxt(flist)
-times = np.loadtxt(tlist)
-
-arr_list = []
-fulltime = []
-i = 0
-for ll in filepaths:
-    t = i*120 + times
-    arr_list.append(np.load(ll))
-    fulltime.append(t)
-    i = i+1
-
-spec = np.concatenate(arr_list,axis = 1)
 kernel = np.array(((1,2,1),(2,4,2),(1,2,1)))
 smoother = kernel[:,:,None]
 spec = sig.convolve(spec,smoother,mode = 'same')
 spec /=np.sum(kernel)
 spec[spec<=0.1] = 0.1
-times2 = np.concatenate(fulltime)
-
 spec = spec - np.mean(spec,axis = (0,1))[None,None,:]
 spec = spec / np.std(spec, axis = (0,1))[None,None,:]
 
@@ -61,7 +45,7 @@ grid.origin = (0,0,0)
 grid.spacing = (1,0.5,0.5)
 grid.cell_data['spec'] = spec.flatten(order = 'F')
 outline = grid.outline
-threshed = grid.clip('z',origin= (0,0,100))#.threshold(2)
+threshed = grid.threshold(2)
 # labels =  dict(ztitle='channel', xtitle='frequency', ytitle='time')
 
 # new = grid.cells_to_points()
@@ -81,13 +65,12 @@ threshed = grid.clip('z',origin= (0,0,100))#.threshold(2)
 p = pv.Plotter()
 p.add_mesh(threshed, lighting= False)
 p.camera.zoom(1.5)
-p.show_bounds()
 p.show(auto_close=False)
-viewup = [0.5, 0.5, 1]
-path = p.generate_orbital_path(n_points=40, shift=threshed.length, viewup= viewup)
-p.open_gif('C:/Users/Calder/Outputs/DASplots2/unknownUNclipped.gif')
-p.orbit_on_path(path, write_frames=True)
-p.close()
+# viewup = [0.5, 0.5, 1]
+# path = p.generate_orbital_path(n_points=40, shift=threshed.length, viewup= viewup)
+# p.open_gif('C:/Users/Calder/Outputs/DASplots2/unknownUNclipped.gif')
+# p.orbit_on_path(path, write_frames=True)
+# p.close()
 
 
 # %%
