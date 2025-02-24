@@ -45,7 +45,7 @@ grid.origin = (0,0,0)
 grid.spacing = (1,0.5,0.5)
 grid.cell_data['spec'] = spec.flatten(order = 'F')
 outline = grid.outline
-threshed = grid.threshold(2)
+threshed = grid.threshold(2.1)
 # labels =  dict(ztitle='channel', xtitle='frequency', ytitle='time')
 
 # new = grid.cells_to_points()

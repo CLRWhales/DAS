@@ -41,7 +41,7 @@ def PostProcessVis(directory):
     #channels = channels[::4]
     for chan in range(data.shape[2]):
         fname = 'C:/Users/Calder/Outputs/DASplots4/' + 'fig_'+str(channels[chan])+'.png'
-        plt.figure(figsize=(15,5))
+        plt.figure(figsize=(10,15))
         plt.imshow(np.fliplr(data[:,:,chan]),cmap = 'turbo', origin = 'lower', aspect = 'auto', extent = (np.min(fullmins),np.max(fullmins),np.min(freqs),np.max(freqs)))
         plt.colorbar(label = 'strain: dB re 1 pE')
         plt.title(str(channels[chan])+' (m)')

@@ -12,6 +12,8 @@ def load_DASout(directory,dtype,nworkers = 1):
 
     inputs:
     X: directory of files, without trailing slash
+    dtype: are you loading  FTX of TX ?
+    nworkers: how many threads do you want running? default is 1
 
     returns:
     data: concatenated np array of data in the directory of dimension FTX
@@ -77,12 +79,18 @@ def load_DASout(directory,dtype,nworkers = 1):
             raise TypeError('dtype must be either "FTX", "TX"')
 
 
-path = "C:/Users/Calder/Outputs/SWctest20250204T134426/5Hz_30Hz"
+path = "C:/Users/Calder/Outputs/ShipWhaleClean20250204T181740/5Hz_30Hz"
 tmp, times, channels= load_DASout(path,'TX',2)
 times = times/60
-plt.figure()
-plt.imshow(np.fliplr(tmp), aspect= 'auto',cmap = 'turbo',extent = (np.max(channels),np.min(channels),np.max(times),np.min(times)))
+#%%
+mtmp = np.mean(tmp,axis = 0)
+mt2 = tmp-mtmp[None,:]
+mt2std = np.std(mt2,axis = 0)
+mt3 = mt2/mt2std[None,:]
+plt.figure(figsize= (10,15))
+plt.imshow(np.fliplr(mt3), aspect= 'auto',cmap = 'seismic',extent = (np.max(channels),np.min(channels),np.max(times),np.min(times)))
 plt.colorbar()
-plt.clim(10,50)
+plt.clim(-3,3)
+
 
 # %%

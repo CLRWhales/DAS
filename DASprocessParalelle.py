@@ -163,7 +163,7 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
          
 
 
-    # STFT
+    # STFT 
     match config['FFTInfo']['input_type']:
         case 'point':
             N_samp= int(config['FFTInfo']['n_samp'])
@@ -181,7 +181,6 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
         case _:
             raise TypeError('input must be either "point" or "time", if time, make sure divisions yield power of 2 for speed')
 
-    
     
 
     #saving info
