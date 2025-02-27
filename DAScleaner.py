@@ -92,7 +92,7 @@ class DAS_cleaner:
         #load in the meta data
         tmpdir = dir_path
         for i in range(4):
-            clist = glob.glob(tmpdir + '/Dim_Channel.txt')
+            clist = glob.glob(os.path.join(tmpdir, 'Dim_Channel.txt'))
             if clist:
                 break
             else:
@@ -101,15 +101,15 @@ class DAS_cleaner:
         if i == 4:
             raise ValueError("could not find channel, frequency, or time files within 4 levels, check directory")
 
-        channels = np.loadtxt(tmpdir + '/Dim_Channel.txt')
-        self.times =  np.loadtxt(tmpdir + '/Dim_Time.txt')
+        channels = np.loadtxt(os.path.join(tmpdir, 'Dim_Channel.txt'))
+        self.times =  np.loadtxt(os.path.join(tmpdir, 'Dim_Time.txt'))
         self.ltimes = len(self.times)
         self.tdif = self.times[1] - self.times[0]
         self.lchannel = len(channels)
         self.cmin = np.min(channels)
         self.cmax = np.max(channels)
 
-        shipfile = glob.glob(tmpdir + '/AIS_projection.csv')
+        shipfile = glob.glob(os.path.join(tmpdir , 'AIS_projection.csv'))
         self.AIS_data = None
         if shipfile:
             print(shipfile)
@@ -135,7 +135,7 @@ class DAS_cleaner:
     def savetable(self):
         dnames = [os.path.basename(file) for file in self.file_paths]
         rows = zip(dnames,self.whale_list,self.ship_list,self.earthquake_list,self.bad_list,self.red_list,self.seen)
-        fname = os.path.split(self.file_paths[1])[0] + '/id_flag.csv'
+        fname = os.path.join(os.path.split(self.file_paths[1])[0] , '/id_flag.csv')
         with open(fname, 'w',encoding="ISO-8859-1") as f:
             writer = csv.writer(f)
             writer.writerow(['file_name','whale_flag','ship_flag','earthquake_flag','bad_flag','red_flag','seen_flag'])

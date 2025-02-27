@@ -1,6 +1,6 @@
 #this script is the first steps into a consistent processing pipeline for bulk data runs based on an ini file io
 #%%
-#import sys, os
+import os
 import glob,time
 import numpy as np # pandas as pd
 #import matplotlib.pyplot as plt
@@ -25,7 +25,7 @@ def load_file(channels, verbose, filepath):
     load a single DAS file -> from kevinG
     """
     if verbose: 
-        fid = filepath.split('/')[-1];  print(f"/nloading file {fid}")
+        fid = os.path.basename(filepath);  print(f"/nloading file {fid}")
     data, meta = load_DAS_file(filepath, chIndex=channels, roiIndex=None, samples=None,
                       integrate=False, unwr=False, metaDetail=1, useSensitivity=False,
                       spikeThr=None)
@@ -39,7 +39,7 @@ def load_files(path_data, channels, verbose, fileIDs):
     # create a thread pool
     with ThreadPoolExecutor(len(fileIDs)) as exe:
         
-        file_paths = [path_data + str(fid) + '.hdf5' for fid in fileIDs]
+        file_paths = [os.path.join(path_data, str(fid) + '.hdf5') for fid in fileIDs]
         # load files
         results = exe.map(partial(load_file,channels, verbose), file_paths)
         # collect data
@@ -190,36 +190,37 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
 
     if fileIDs[0] == config['Append']['first']:
 
-        freqname = config['Append']['outputdir'] + '/Dim_Frequency.txt'
+        freqname = os.path.join(config['Append']['outputdir'] , 'Dim_Frequency.txt')
         np.savetxt(freqname,freqs)
 
         channeldistance = list_meta[0]['appended']['channels'][chIDX]
-        channelname= config['Append']['outputdir'] + '/Dim_Channel.txt'
+        channelname= os.path.join(config['Append']['outputdir'] ,'Dim_Channel.txt')
         np.savetxt(channelname,channeldistance)
 
-        timename = config['Append']['outputdir'] + '/Dim_Time.txt'
+        timename = os.path.join(config['Append']['outputdir'] , 'Dim_Time.txt')
         np.savetxt(timename,times)
 
-        cfgname = config['Append']['outputdir'] + '/config.ini'
+        cfgname = os.path.join(config['Append']['outputdir'] , 'config.ini')
         with open(cfgname, 'w') as configfile:
             config.write(configfile)
 
         
     match config['SaveInfo']['data_type']: 
         case 'magnitude':
-            magdir = config['Append']['outputdir'] + '/Magnitude'
+            magdir = os.path.join(config['Append']['outputdir'] , 'Magnitude')
             Path(magdir).mkdir(exist_ok=True)
             spec = 10*np.log10(abs(spec))
-            data_name = magdir + '/FTX' + str(fs_target) + '_' + fdate +'Z'
+            fname = 'FTX' + str(fs_target) + '_' + fdate +'Z'
+            data_name = os.path.join(magdir,fname)
             np.save(data_name,spec)
 
             
         case 'complex':
-            #print('complex')
-            compdir = config['Append']['outputdir'] + '/Complex'
+            compdir = os.path.join(config['Append']['outputdir'] , 'Complex')
             Path(compdir).mkdir(exist_ok=True)
             spec = 10*np.log10(spec)
-            data_name = compdir + '/FTX' + str(fs_target) + '_' + fdate +'Z'
+            fname = 'FTX' + str(fs_target) + '_' + fdate +'Z'
+            data_name = os.path.join(compdir,fname)
             np.save(data_name,spec)
 
         case 'cleaning':
@@ -231,10 +232,11 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
                     break
                 f_idx = np.where(np.logical_and(freqs >= l,freqs <= h))
                 TX = 10*np.log10(np.mean(abs(spec[f_idx[0],:,:]),axis = 0))
-                cleandir = config['Append']['outputdir'] + '/' + str(l) + 'Hz_' + str(h) + 'Hz'
+                cleandir = os.path.join(config['Append']['outputdir'] , str(l) + 'Hz_' + str(h) + 'Hz')
                 Path(cleandir).mkdir(exist_ok=True)
-                fname = cleandir + '/TX' + str(fs_target) + '_' + fdate +'Z'
-                np.save(fname,TX)
+                fname = 'TX' + str(fs_target) + '_' + fdate +'Z'
+                fout = os.path.join(cleandir, fname)
+                np.save(fout,TX)
             
         case _:
             raise TypeError('input must be either "magnitude", "complex","cleaning" ')
@@ -244,8 +246,8 @@ def DAS_processor(X):
     config.read(filenames=X)
 
     #setup 
-    filepaths = sorted( glob.glob(config['DataInfo']['Directory'] + '*.hdf5') )
-    files = [f.split('\\')[-1] for f in filepaths] 
+    filepaths = sorted( glob.glob(os.path.join(config['DataInfo']['Directory'], '*.hdf5')))
+    files = [os.path.basename(f) for f in filepaths] 
     fileIDs = [int(item.split('.')[0]) for item in files]
 
     if len(fileIDs)== 0:
@@ -268,7 +270,7 @@ def DAS_processor(X):
     list_fids = [fileIDs[x:x+n_files] for x in range(0, len(fileIDs), n_files)]
 
     #find channels
-    firstfile = config['DataInfo']['directory'] + fileIDs[0] + '.hdf5'
+    firstfile = os.path.join(config['DataInfo']['directory'] , fileIDs[0] + '.hdf5')
     channels = []
     meta = Calder_utils.load_meta(firstfile)
     chans = meta['header']['channels']
@@ -298,7 +300,7 @@ def DAS_processor(X):
 
     #making the output directory
     tnow = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
-    outputdir = config['SaveInfo']['directory']+config['SaveInfo']['run_name']+tnow
+    outputdir = os.path.join(config['SaveInfo']['directory'],config['SaveInfo']['run_name']+tnow)
     Path(outputdir).mkdir()
     
     config['Append'] = {'first':fileIDs[0],
