@@ -2,22 +2,45 @@
 #%%
 import os
 import glob,time
-import numpy as np # pandas as pd
-#import matplotlib.pyplot as plt
+import numpy as np 
 from scipy.signal import detrend, resample, butter, sosfiltfilt
-#import utils_tmp, utils_time
 from simpleDASreader4 import load_DAS_file, unwrap, combine_units #nned this if the other functions are uncommented
-#from skimage import measure, filters,morphology
-#from scipy.ndimage import gaussian_filter
 from DASFFT import sneakyfft
 import configparser
-#import argparse
+import argparse
 import Calder_utils
 import math
 import datetime
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from functools import partial
-from pathlib import Path
+import tkinter as tk
+from tkinter import filedialog
+
+def load_INI():
+    """
+    this function loads an ini file from the terminal or file browser
+    TODO: 
+        build in a default/imput checking portion so that we can make sure that it is all good to run. 
+    """
+
+    parser = argparse.ArgumentParser(description="Process a filename.")
+    parser.add_argument("filename", nargs="?", type=str, help="The name of the file to process")
+    
+    args = parser.parse_args()
+    
+    if args.filename is None:
+        root = tk.Tk()
+        root.withdraw()  # Hide the root window
+        args.filename = filedialog.askopenfilename(title="Select a file")
+        root.destroy()
+    
+    config = None
+    if args.filename:
+        config = configparser.ConfigParser()
+        config.read(filenames=args.filename)
+    
+    return config
+
 
 
 def load_file(channels, verbose, filepath):
@@ -208,7 +231,8 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
     match config['SaveInfo']['data_type']: 
         case 'magnitude':
             magdir = os.path.join(config['Append']['outputdir'] , 'Magnitude')
-            Path(magdir).mkdir(exist_ok=True)
+            #Path(magdir).mkdir()
+            os.makedirs(magdir, exist_ok=True)
             spec = 10*np.log10(abs(spec))
             fname = 'FTX' + str(fs_target) + '_' + fdate +'Z'
             data_name = os.path.join(magdir,fname)
@@ -217,7 +241,8 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
             
         case 'complex':
             compdir = os.path.join(config['Append']['outputdir'] , 'Complex')
-            Path(compdir).mkdir(exist_ok=True)
+            #Path(compdir).mkdir(exist_ok=True)
+            os.makedirs(compdir, exist_ok=True)
             spec = 10*np.log10(spec)
             fname = 'FTX' + str(fs_target) + '_' + fdate +'Z'
             data_name = os.path.join(compdir,fname)
@@ -233,7 +258,8 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
                 f_idx = np.where(np.logical_and(freqs >= l,freqs <= h))
                 TX = 10*np.log10(np.mean(abs(spec[f_idx[0],:,:]),axis = 0))
                 cleandir = os.path.join(config['Append']['outputdir'] , str(l) + 'Hz_' + str(h) + 'Hz')
-                Path(cleandir).mkdir(exist_ok=True)
+                #Path(cleandir).mkdir(exist_ok=True)
+                os.makedirs(cleandir, exist_ok= True)
                 fname = 'TX' + str(fs_target) + '_' + fdate +'Z'
                 fout = os.path.join(cleandir, fname)
                 np.save(fout,TX)
@@ -241,9 +267,12 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
         case _:
             raise TypeError('input must be either "magnitude", "complex","cleaning" ')
 
-def DAS_processor(X):
-    config = configparser.ConfigParser()
-    config.read(filenames=X)
+def DAS_processor():
+    config = None
+    config = load_INI()
+
+    if not config:
+        raise ValueError("could not find the config, check file path")
 
     #setup 
     filepaths = sorted( glob.glob(os.path.join(config['DataInfo']['Directory'], '*.hdf5')))
@@ -301,7 +330,7 @@ def DAS_processor(X):
     #making the output directory
     tnow = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
     outputdir = os.path.join(config['SaveInfo']['directory'],config['SaveInfo']['run_name']+tnow)
-    Path(outputdir).mkdir()
+    os.makedirs(outputdir)
     
     config['Append'] = {'first':fileIDs[0],
                         'outputdir':outputdir}
@@ -321,9 +350,10 @@ def DAS_processor(X):
             
         
 if __name__ == '__main__':
-    config_name = "C:/Users/Calder/Workspace/Python_Env/DAS/example.ini"
+
+    #config_name = "C:/Users/Calder/Workspace/Python_Env/DAS/example.ini"
     t_ex_start=time.perf_counter()  
-    DAS_processor(config_name)
+    DAS_processor()
     t_ex_end=time.perf_counter(); print(f'duration: {t_ex_end-t_ex_start}s'); 
 
 
