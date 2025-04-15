@@ -13,8 +13,16 @@ import math
 import datetime
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from functools import partial
-import tkinter as tk
-from tkinter import filedialog
+
+
+#handling lack of tk on some linux distross. shoddy, need to fix in the future
+try:
+    import tkinter as tk
+except ImportError:
+    available = False
+else:
+    available = True
+    from tkinter import filedialog
 
 def load_INI():
     """
@@ -28,7 +36,7 @@ def load_INI():
     
     args = parser.parse_args()
     
-    if args.filename is None:
+    if args.filename is None and available:
         root = tk.Tk()
         root.withdraw()  # Hide the root window
         args.filename = filedialog.askopenfilename(title="Select a file")
@@ -280,7 +288,9 @@ def DAS_processor():
     fileIDs = [int(item.split('.')[0]) for item in files]
 
     if len(fileIDs)== 0:
-        raise ValueError("Data files cannot be found, check path ends with slash")
+        print(os.path.join(config['DataInfo']['Directory'], '*.hdf5'))
+        #raise ValueError("Data files cannot be found, check path ends with slash")
+    
     
 
     if len(config['ProcessingInfo']['starttime'])>0:

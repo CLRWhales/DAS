@@ -135,16 +135,18 @@ class DAS_cleaner:
     def savetable(self):
         dnames = [os.path.basename(file) for file in self.file_paths]
         rows = zip(dnames,self.whale_list,self.ship_list,self.earthquake_list,self.bad_list,self.red_list,self.seen)
-        fname = os.path.join(os.path.split(self.file_paths[1])[0] , '/id_flag.csv')
+        fname = os.path.join(os.path.split(self.file_paths[1])[0] , 'id_flag.csv')
+        print(fname)
         with open(fname, 'w',encoding="ISO-8859-1") as f:
             writer = csv.writer(f)
             writer.writerow(['file_name','whale_flag','ship_flag','earthquake_flag','bad_flag','red_flag','seen_flag'])
             for row in rows:
                 writer.writerow(row)
-        
+         
     def display_images(self):
         self.canvas.delete("all")
-        self.current_images = []
+        self.current_images.clear()
+        #self.current_images = []
 
         flag_list = list(zip(self.whale_list,self.ship_list,self.earthquake_list,self.bad_list,self.red_list))
 

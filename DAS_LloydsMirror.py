@@ -42,3 +42,90 @@ plt.plot(fiber_x,fiber_RL)
 #plt.plot(fiber_x, whale_r_slope)
 #plt.plot(fiber_x,theta)
 # %%
+import numpy as np
+import matplotlib.pyplot as plt
+
+x= np.arange(start = -10000, stop = 10000)
+y= 1000.0
+z = 300.0
+zs = 30.0
+fs = 125
+c = 1500.0
+
+#Distance from whale to cable: 
+y = 0.0
+R = np.sqrt(x*x + y*y + z*z)
+ap1 = x*x/(R*R*R)
+as1 = 2*np.sqrt(y*y+z*z)*x/(R*R*R)
+#Include source ghost effect: 
+c2 = z/R
+arg2 = 2*np.pi*fs*zs*c2/c
+app1 = ap1*abs(np.sin(arg2))
+
+
+#Distance from whale to cable: 
+y = 5000
+R = np.sqrt(x*x + y*y + z*z)
+ap2 = x*x/(R*R*R)
+as2 = 2*np.sqrt(y*y+z*z)*x/(R*R*R)
+#Include source ghost effect: 
+c2 = z/R
+arg2 = 2*np.pi*fs*zs*c2/c
+app2 = ap2*abs(np.sin(arg2))
+
+#Distance from whale to cable: 
+y = 0.0
+zs = 10
+
+R = np.sqrt(x*x + y*y + z*z)
+ap3 = x*x/(R*R*R)
+as3 = 2*np.sqrt(y*y+z*z)*x/(R*R*R)
+#Include source ghost effect: 
+c2 = z/R
+arg2 = 2*np.pi*fs*zs*c2/c
+app3 = ap3*abs(np.sin(arg2))
+
+
+plt.plot(x,ap1)
+plt.plot(x,as1)
+plt.plot(x,ap2)
+plt.plot(x,as2)
+plt.close()
+
+
+plt.plot(x,app1)
+plt.plot(x,app2)
+plt.plot(x,app3)
+
+# %%
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+x= np.arange(start = -10000, stop = 10000)
+y= 500
+z = 300.0
+zs = 10
+fs = 125
+c = 1500.0
+
+freqs = np.arange(start=10, stop=150, step= 1)
+ranges = np.arange(start=0, stop=5000, step = 50)
+depths = np.arange(start = 1, stop = 299)
+out = np.zeros((depths.size,x.size))
+
+for i in range(out.shape[0]):
+    #y = ranges[i]
+    zs = depths[i]
+    #fs= freqs[i]
+    R = np.sqrt(x*x + y*y + z*z)
+    ap3 = x*x/(R*R*R)
+    #as3 = 2*np.sqrt(y*y+z*z)*x/(R*R*R)
+    #Include source ghost effect: 
+    c2 = z/R
+    arg2 = 2*np.pi*fs*zs*c2/c
+    out[i,] = ap3*abs(np.sin(arg2))
+
+plt.imshow(out, aspect='auto', extent = (np.min(x),np.max(x), np.min(depths),np.max(depths)), origin = 'lower')
+
+# %%

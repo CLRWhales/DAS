@@ -79,18 +79,18 @@ def load_DASout(directory,dtype,nworkers = 1):
             raise TypeError('dtype must be either "FTX", "TX"')
 
 
-path = "C:/Users/Calder/Outputs/ShipWhaleClean20250204T181740/5Hz_30Hz"
-tmp, times, channels= load_DASout(path,'TX',2)
-times = times/60
-#%%
-mtmp = np.mean(tmp,axis = 0)
-mt2 = tmp-mtmp[None,:]
-mt2std = np.std(mt2,axis = 0)
-mt3 = mt2/mt2std[None,:]
-plt.figure(figsize= (10,15))
-plt.imshow(np.fliplr(mt3), aspect= 'auto',cmap = 'seismic',extent = (np.max(channels),np.min(channels),np.max(times),np.min(times)))
-plt.colorbar()
-plt.clim(-3,3)
+# path = "C:/Users/Calder/Outputs/ShipWhaleClean20250204T181740/5Hz_30Hz"
+# tmp, times, channels= load_DASout(path,'TX',2)
+# times = times/60
+# #%%
+# mtmp = np.mean(tmp,axis = 0)
+# mt2 = tmp-mtmp[None,:]
+# mt2std = np.std(mt2,axis = 0)
+# mt3 = mt2/mt2std[None,:]
+# plt.figure(figsize= (10,15))
+# plt.imshow(np.fliplr(mt3), aspect= 'auto',cmap = 'seismic',extent = (np.max(channels),np.min(channels),np.max(times),np.min(times)))
+# plt.colorbar()
+# plt.clim(-3,3)
 
 
 # %%
