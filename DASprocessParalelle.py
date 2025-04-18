@@ -324,7 +324,22 @@ def DAS_processor():
             n_synthetic = np.floor(len(chans)/spacing)
             n_synthetic = int(n_synthetic)
             for i in range(n_synthetic):
-                channels.extend([x+i*int(config['ProcessingInfo']['synthetic_spacing']) for x in range(0,int(config['ProcessingInfo']['n_stack']))])
+                channels.extend([x+i*spacing for x in range(0,nstack)])
+            channels[:] = [x for x in channels if x <= np.max(chans)]
+
+        case 'meter':
+            dx = int(chans[1]-chans[0])
+            spacing = int(np.rint(int(config['ProcessingInfo']['synthetic_spacing'])/dx))
+            nstack = int(config['ProcessingInfo']['n_stack'])
+            n_synthetic = np.floor(len(chans)/spacing)
+            n_synthetic = int(n_synthetic)
+
+            if nstack > spacing:
+                nstack = nstack - (nstack - spacing - 1) #makes the nstacks fit nicely within spacing
+                print('reducing stack size to fit in spacing.')
+            
+            for i in range(n_synthetic):
+                channels.extend([x+i*spacing for x in range(0,nstack)])
             channels[:] = [x for x in channels if x <= np.max(chans)]
 
         case _:
