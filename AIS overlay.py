@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 import utm
 
-path = "D:/DAS/cablecoordsUTM/InnerCabel_UTM_Coord_NorgesKart.txt"
+path = "D:/DAS/cablecoordsUTM/OuterCabel_UTM_Coord_NorgesKart.txt"
 
 data = pd.read_csv(path, sep = "\t")
 #data.plot(x = 'UTMX',y = 'UTMY')
@@ -20,7 +20,7 @@ line_coords_UTM.reverse() #to move longyearbyen to the top?
 
 line = LineString([utm.to_latlon(east,north,33,'X') for east,north in line_coords_UTM]) #moves UTM to lon,lat and makes a line object
 
-AIS = "D:/DAS/cablecoordsUTM/AIS20220817_27.csv"
+AIS = "D:/DAS/cablecoordsUTM/AIS20220821_28.csv"
 track = pd.read_csv(AIS, sep = ';')
 
 
@@ -42,7 +42,7 @@ for lat, lon, timestamp, name, mmsi, imo, callsign in track_data:
 # Convert results to DataFrame
 output = pd.DataFrame(results, columns=["timestamp", "track_lat", "track_lon", "closest_lat", "closest_lon","closest_prop_LYB", "distance_m", "name","MMSI","IMO","Callsing"])
 
-output.to_csv("D:/DAS/cablecoordsUTM/AIS_projection_Inner_full.csv", index = False)
+output.to_csv("D:/DAS/cablecoordsUTM/AIS_projection_Outer_full.csv", index = False)
 #print(df)
 
 # %%

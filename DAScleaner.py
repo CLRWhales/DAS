@@ -5,12 +5,15 @@ from tkinter import filedialog, simpledialog
 from PIL import Image, ImageTk
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import matplotlib
 import re 
 import csv
 import glob
 from collections import deque
 from datetime import datetime, timedelta
 import pandas as pd
+
+matplotlib.use('agg')
 
 def read_csv_columns(file_path):
         with open(file_path, newline='', encoding='utf-8') as csvfile:
@@ -146,7 +149,7 @@ class DAS_cleaner:
     def display_images(self):
         self.canvas.delete("all")
         self.current_images.clear()
-        #self.current_images = []
+        self.current_images = []
 
         flag_list = list(zip(self.whale_list,self.ship_list,self.earthquake_list,self.bad_list,self.red_list))
 
