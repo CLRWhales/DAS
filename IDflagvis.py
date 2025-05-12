@@ -7,12 +7,12 @@ import glob, os
 
 path = "C:/Users/Calder/Outputs/20220821CRfull_20250414T173836/5Hz_30Hz/id_flag.csv"
 
-dir = 'C:\\Users\\Calder\\\Outputs\\NORSAR01v2_cleaning\\ID_flags'
+dir = 'C:\\Users\\Calder\\Outputs\\E7_cleaning\\NORSAR01v2_cleaning_outer\\ID_flags'
 
 paths = glob.glob(os.path.join(dir, '*.csv'))
 
-highlight_interval = pd.Timedelta(minutes=30)
-highlight_duration = pd.Timedelta(minutes=6)
+highlight_interval = pd.Timedelta(minutes=20)
+highlight_duration = pd.Timedelta(minutes=4)
 
 
 for f in paths:

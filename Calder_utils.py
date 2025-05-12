@@ -4,11 +4,11 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 import glob
 import h5pydict
+import os
 
 def faststack(X,n, wind = 1):
      """ fast adjacent channel stack through time
-     Inputs:
-     Parameters
+    Parameters
     ----------
     X : 2d np.array 
         2d data array with dimension (T,X).
@@ -46,12 +46,18 @@ def faststack(X,n, wind = 1):
 
      return stacked
 
-def loadFTX(directory,nworkers = 1): 
+def loadFTX(directory,nworkers = 1,start_f=None, stop_f=None, start_cidx=None, stop_cidx=None): 
     """
     This is a function that can be used to quickly load FTX files in a directory. if there are too many files/too large, can overload the ram. 
 
     inputs:
     X: directory of files, without trailing slash
+    nworkers: how many workers do you want to deploy?
+    startf: index of frequency start for slicing
+    stopf: index of frequency stop for slicing
+    start_cidx: index of channel start for slicing
+    stop_cidx: index of channel stop for slicing
+
 
     returns:
     data: concatenated np array of data in the directory of dimension FTX
@@ -64,17 +70,25 @@ def loadFTX(directory,nworkers = 1):
 
     """
 
-    clist = directory + '/Dim_Channel.txt'
-    flist = directory + '/Dim_Frequency.txt'
-    tlist = directory + '/Dim_Time.txt'
+    tmpdir = directory
+    for i in range(4):
+        clist = glob.glob(os.path.join(tmpdir, 'Dim_Channel.txt'))
+        if clist:
+            break
+        else:
+            tmpdir = os.path.split(tmpdir)[0]
 
-    filepaths = sorted( glob.glob(directory + '*.npy') )#[0:10]
+    if i == 4:
+        raise ValueError("could not find channel, frequency, or time files within 4 levels, check directory")
+
+    channels = np.loadtxt(os.path.join(tmpdir, 'Dim_Channel.txt'))[start_cidx:stop_cidx]
+    times =  np.loadtxt(os.path.join(tmpdir, 'Dim_Time.txt'))
+    freqs = np.loadtxt(os.path.join(tmpdir, 'Dim_Frequency.txt'))[start_f:stop_f]
+
+    filepaths = sorted( glob.glob(os.path.join(directory, '*.npy')))#[0:10]
     if len(filepaths) == 0:
         raise ValueError("no files found at directory.")
     
-    channels = np.loadtxt(clist)
-    freqs = np.loadtxt(flist)
-    times = np.loadtxt(tlist)
     lt = len(times)
     bt = np.arange(len(times),dtype= 'int')
 
@@ -84,7 +98,7 @@ def loadFTX(directory,nworkers = 1):
         futures = exe.map(np.load,filepaths)
         for i, ff in enumerate(futures):
             tidx = i*lt + bt
-            data[:,tidx,:] = ff
+            data[:,tidx,:] = ff[start_f:stop_f,:,start_cidx:stop_cidx]
 
     times = np.arange(start = 0, stop = data.shape[1])*0.25
 
@@ -116,3 +130,8 @@ def load_meta(filename,metaDetail = 1):
         else:
             meta = m
     return meta
+
+def window_rms(a, windowsize):
+    a2 = np.square(a)
+    window = np.ones(windowsize)/float(windowsize)
+    return np.sqrt(np.convolve(a2, window, 'valid'))

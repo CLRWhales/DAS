@@ -8,7 +8,7 @@ from Calder_utils import loadFTX
 import time
 
 
-directory = 'C:/Users/Calder/Outputs/DASdata2/'
+directory = 'C:\\Users\\Calder\\Outputs\\DASdata2\\'
 t_ex_start=time.perf_counter()  
 spec,freqs,times,channels = loadFTX(directory= directory,
                                     nworkers= 10)
