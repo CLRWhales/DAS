@@ -8,15 +8,16 @@ def hyperbola_2(x,b,c,d,v):
 
 crossrange = 1000
 c = 0
-v = 1450
+v = 1500
 d = 0
-b = crossrange/1450
+b = crossrange/v
 
 x = np.arange(-5000,5000,1)
 
-crossrange = np.arange(0,10,1)*500
+crossrange = np.arange(0,10,1)*-1000 +1
+print(crossrange)
 for cross in crossrange:
-    b = cross/1450
+    b = cross/v
     y = hyperbola_2(x,b,c,d,v)
     plt.plot(x,y)
     plt.xlabel('fiber')

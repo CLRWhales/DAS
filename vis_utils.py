@@ -40,10 +40,43 @@ def PostProcessVis(src, dst, norm = True):
 
 
 
-src = 'C:\\Users\\Calder\\Outputs\\3D_cornellposter20250428T155428\\Magnitude'
-dst = 'C:\\Users\\Calder\\Outputs\\CornellPosterplots'
-tmp = PostProcessVis(src,dst, norm = False)
+# src = 'C:\\Users\\Calder\\Outputs\\3D_cornellposter20250428T155428\\Magnitude'
+# dst = 'C:\\Users\\Calder\\Outputs\\CornellPosterplots'
+# tmp = PostProcessVis(src,dst, norm = False)
 
+def joyplot(data, axis = 0, lcolor = 'white',offset=2):
+    '''
+    This plot make a joy division plot
 
+    inputs:
+    a, 2d np array of data to visualize
+    axis, int, along which axis ar ethe data to be split along
+    lcolor: str, line color, black on white, or white on black?
+    '''
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    offset = 2  # Vertical spacing between lines
+
+    for i, row in enumerate(data):
+        y = row + i * offset
+        x = np.arange(len(row))
+
+        # Fill white to hide lower lines
+        ax.fill_between(x, y - offset, y + offset, color='white', zorder=i)
+
+        # Plot the line in black
+        ax.plot(x, y, color='black', linewidth=1, zorder=i+1)
+
+    # Set white background
+    ax.set_facecolor('white')
+    fig.patch.set_facecolor('white')
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlim(0, data.shape[1] - 1)
+    ax.set_ylim(-offset, data.shape[0] * offset)
+    ax.invert_yaxis()
+
+    plt.tight_layout()
+    plt.show()
   
 # %%

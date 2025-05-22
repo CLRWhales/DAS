@@ -45,18 +45,18 @@ def error_function(params, x, y):
   predicted_y = hyperbola_equation(x, a, b, c)
   return np.sum((y - predicted_y)**2)
 
-def error_function2(params, x, y):
+def error_function2(params, x, y,w):
   b,c,d,v = params
   predicted_y = hyperbola_2(x, b, c, d,v)
-  return np.sum((y - predicted_y)**2)
+  return np.sum(w*(y - predicted_y)**2)
 
 directory = 'E:\\NORSAR01v2\\20220821\\dphi'
 files=  glob.glob(os.path.join(directory, '*.hdf5'))
 
-start = '183007'
-stop = '183037'
+start = '180007'
+stop = '190007'
 nchans = 15000
-dst = 'C:\\Users\\Calder\\Outputs\\annotatedtx2'
+dst = 'C:\\Users\\Calder\\Outputs\\annotatedtx3'
 nstack = 5
 low = 25, 
 high = 99
@@ -96,7 +96,7 @@ maxchan = []
 mintime= []
 maxtime = []
 aspect = []
-
+weights = []
 
 #####start the routine####
 
@@ -205,16 +205,19 @@ for f in files:
 
 
             #fitting hyperbolas
-            c = crange/2 * dx
-            initial_guess = [b,c,d,v]
+            
             wind  = np.ones(7)
             #get the scatter values for fitting
             scat = np.argmax(mag[minr-buffer:maxr+buffer,minc-buffer:maxc+buffer], axis = 0)
+            magW = np.max(mag[minr-buffer:maxr+buffer,minc-buffer:maxc+buffer], axis = 0)
             y = scat*dt
             y = np.convolve(y, wind/np.sum(wind), mode = 'valid')
+            w = np.convolve(magW, wind/np.sum(wind), mode = 'valid')
+            c = np.argmax(w) * dx
+            initial_guess = [b,c,d,v]
             x = np.arange(start=0,stop = len(y), step = 1)*dx
             
-            results= optimize.minimize(error_function2,x0=initial_guess,args = (x,y))
+            results= optimize.minimize(error_function2,x0=initial_guess,args = (x,y,w))
 
             #Prepping data for export
             scatters.append(scat*dt)
@@ -228,6 +231,7 @@ for f in files:
             mintime.append(minr*dt)
             maxtime.append(maxr*dt)
             aspect.append(ap)
+            weights.append(magW)
             
 
     #plt.tight_layout()
@@ -236,7 +240,7 @@ for f in files:
     plt.close()
     del fig,ax
 
-tmp_struct = list(zip(b_out,c_out,d_out,v_out,fnames,minchan,maxchan,mintime,maxtime,aspect,scatters))
+tmp_struct = list(zip(b_out,c_out,d_out,v_out,fnames,minchan,maxchan,mintime,maxtime,aspect,scatters,weights))
 
 data_name = os.path.join(dst,'data_out.pkl')
 with open(data_name, "wb") as file:
@@ -252,15 +256,18 @@ for i,s in enumerate(scatters):
     ypred = hyperbola_2(x,b_out[i],c_out[i],d_out[i],v_out[i])
     plt.plot(x,ypred, 'red')
     pname = os.path.join(dst,fnames[i] + '_'+ str(i)+'.png')
+    plt.xlabel('Relative distance (m)')
+    plt.ylabel('Relative Time (s)')
+    plt.ylim(0,4)
     plt.savefig(pname)
     plt.close()
 
 
 # %% playing around with CFAR
-import numpy as np
-n = 1250
-pfa = 0.018
+# import numpy as np
+# n = 1250
+# pfa = 0.018
 
-scale = n*(pfa**(-1/n)-1)
-print(scale)
+# scale = n*(pfa**(-1/n)-1)
+# print(scale)
 # %%

@@ -7,9 +7,10 @@ from simpleDASreader4 import load_DAS_file
 from Calder_utils import faststack
 import glob, os
 
+directory = 'D:\\DAS\\ASA_inner'
 directory = 'E:\\NORSAR01v2\\20220821\\dphi'
 files=  glob.glob(os.path.join(directory, '*.hdf5'))
-start = '182007'
+start = '180007'
 stop = '190007'
 
 low = 25, 
@@ -43,15 +44,19 @@ for f in files:
                         axis = 0)
 
     
-
+    time = np.arange(signal.shape[0])*dt
+    dist = np.arange(signal.shape[1])*20 / 1000
     vis = 10*np.log10(abs(signal))
     min = np.percentile(vis,low)
     max = np.percentile(vis,high)
-    plt.imshow(vis, cmap = 'turbo', aspect = 'auto')
-    plt.colorbar()
+    plt.imshow(vis, cmap = 'turbo', aspect = 'auto', extent = (np.min(dist),np.max(dist),np.max(time),np.min(time)))
+    #plt.colorbar()
+    plt.xlabel('Fiber distance (km)')
+    plt.ylabel('Time (S)')
     plt.clim(min,max)
     path = 'C:\\Users\\Calder\\Outputs\\waveformtx'
     fname = os.path.join(path,name + '.png')
+    plt.title(name)
     plt.savefig(fname)
     plt.close()
     i = i+1

@@ -251,7 +251,7 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
             compdir = os.path.join(config['Append']['outputdir'] , 'Complex')
             #Path(compdir).mkdir(exist_ok=True)
             os.makedirs(compdir, exist_ok=True)
-            spec = 10*np.log10(spec)
+            #spec = 10*np.log10(spec)
             fname = 'FTX' + str(fs_target) + '_' + fdate +'Z'
             data_name = os.path.join(compdir,fname)
             np.save(data_name,spec)
@@ -271,6 +271,14 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
                 fname = 'TX' + str(fs_target) + '_' + fdate +'Z'
                 fout = os.path.join(cleandir, fname)
                 np.save(fout,TX)
+
+        case 'LTSA':
+            LTSAdir = os.path.join(config['Append']['outputdir'] , 'LTSA')
+            os.makedirs(LTSAdir, exist_ok=True)
+            LTSA = np.mean(abs(spec),axis = 1)
+            fname = 'FX_LTSA' + str(fs_target) + '_' + fdate +'Z'
+            data_name = os.path.join(LTSAdir,fname)
+            np.save(data_name,LTSA)
             
         case _:
             raise TypeError('input must be either "magnitude", "complex","cleaning" ')
