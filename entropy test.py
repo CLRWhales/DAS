@@ -5,6 +5,15 @@ import matplotlib.pyplot as plt
 import glob, os
 
 def compute_entropy(arr):
+    '''
+    computes the local timewise spectral entropy of FTX after prewhitening with the mean
+    inputs
+        arr: FTX np.array
+    outputs:
+        entropy: 2d np array of the spectral entropy through time, relative to the timewise means of the FTX block, same dimension of TX
+
+    
+    '''
     arr = abs(arr)
     arr /= np.mean(arr, axis = 1)[:,None,:] #prewhiten
     arr /=np.sum(arr,axis = 0) #normalize to psd

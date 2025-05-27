@@ -133,7 +133,7 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
                                       fileIDs= fileIDs)
     data =  np.concatenate(list_data, axis=0)
     data, list_meta = preprocess_DAS(data, list_meta)
-    data /= 10E-12 #scaling into units of strain is handled, this moves it to pico strain? 
+    data /= 10E-9 #scaling into units of strain is handled, this moves it to nano strain? 
 
     #do stacking
     n_stack = int(config['ProcessingInfo']['n_stack'])
@@ -191,8 +191,6 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
                         axis = 0)
         
     
-         
-
 
     # STFT 
     match config['FFTInfo']['input_type']:
@@ -200,13 +198,13 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
             N_samp= int(config['FFTInfo']['n_samp'])
             N_overlap = int(config['FFTInfo']['n_overlap'])
             N_fft = int(config['FFTInfo']['n_fft'])
-            window = np.hamming(N_samp)
+            window = np.hanning(N_samp)
             spec, freqs, times = sneakyfft(data,N_samp,N_overlap,N_fft, window,fs_target)
         case 'time':
             N_samp= int(fs_target*float(config['FFTInfo']['n_samp']))
             N_overlap = int(N_samp*float(config['FFTInfo']['n_overlap']))
             N_fft = int(fs_target/float(config['FFTInfo']['n_fft']))
-            window = np.hamming(N_samp)
+            window = np.hanning(N_samp)
             spec, freqs, times = sneakyfft(data,N_samp,N_overlap,N_fft, window,fs_target)
             
         case _:
@@ -241,7 +239,10 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
             magdir = os.path.join(config['Append']['outputdir'] , 'Magnitude')
             #Path(magdir).mkdir()
             os.makedirs(magdir, exist_ok=True)
-            spec = 10*np.log10(abs(spec))
+            np.abs(spec,out = spec)
+            np.log10(spec,out=spec)
+            spec*=10
+            #spec = 10*np.log10(abs(spec))
             fname = 'FTX' + str(fs_target) + '_' + fdate +'Z'
             data_name = os.path.join(magdir,fname)
             np.save(data_name,spec)
@@ -279,6 +280,10 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
             fname = 'FX_LTSA' + str(fs_target) + '_' + fdate +'Z'
             data_name = os.path.join(LTSAdir,fname)
             np.save(data_name,LTSA)
+        
+        case 'entropy':
+            ENTdir = os.path.join(config['Append']['outputdir'] , 'Entropy')
+            os.makedirs(ENTdir,exist_ok=True)
             
         case _:
             raise TypeError('input must be either "magnitude", "complex","cleaning" ')
