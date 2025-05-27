@@ -11,7 +11,7 @@ import argparse
 import Calder_utils
 import math
 import datetime
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from functools import partial
 
 
@@ -377,10 +377,13 @@ def DAS_processor():
         print(channels) 
 
 
-    with ProcessPoolExecutor(max_workers= n_workers) as executor:
-        executor.map(partial(LPS_block, path_data,channels,verbose, config), list_fids)
-       
-            
+    # with ProcessPoolExecutor(max_workers= n_workers) as executor:
+    #     executor.map(partial(LPS_block, path_data,channels,verbose, config), list_fids)
+    
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        futures = [executor.submit(partial(LPS_block, path_data,channels,verbose, config), lf)for lf in list_fids]
+        for future in as_completed(futures):
+            future.result()
         
 if __name__ == '__main__':
 
