@@ -143,10 +143,11 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
         data = Calder_utils.faststack(data,n_stack)
         chIDX = np.arange(start = 0,stop = len(chans), step = n_stack)
     else:
-        chIDX = np.arange(0,len(chans))
+        chIDX = np.arange(start = 0,stop = len(chans))
 
     #do resampling
     dt = list_meta[0]['header']['dt']
+    dx = list_meta[0]['appended']['channels'][chIDX][1] - list_meta[0]['appended']['channels'][chIDX][0]
     if config['ProcessingInfo']['fs_target'] == 'auto':
         fs_target = 2**math.floor(math.log(1/dt,2))
     else:
@@ -191,52 +192,64 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
                         axis = 0)
         
     
-
+    if config['FFTInfo'].getboolean('do_fk'):
+        times = np.arange(data.shape[0])*dt_new
+        windowshape = (int(config['FKInfo']['nfft_time']),int(config['FKInfo']['nfft_space']))
+        fks = Calder_utils.sliding_window_FK(data,windowshape)
+        del data
+        freqs = np.fft.rfftfreq(n=windowshape[0],d=dt_new)
+        WN = np.fft.fftshift(np.fft.fftfreq(n=windowshape[1],d=dx))
+        savetype = 'FK'
+    else:
     # STFT 
-    match config['FFTInfo']['input_type']:
-        case 'point':
-            N_samp= int(config['FFTInfo']['n_samp'])
-            N_overlap = int(config['FFTInfo']['n_overlap'])
-            N_fft = int(config['FFTInfo']['n_fft'])
-            window = np.hanning(N_samp)
-            spec, freqs, times = sneakyfft(data,N_samp,N_overlap,N_fft, window,fs_target)
-        case 'time':
-            N_samp= int(fs_target*float(config['FFTInfo']['n_samp']))
-            N_overlap = int(N_samp*float(config['FFTInfo']['n_overlap']))
-            N_fft = int(fs_target/float(config['FFTInfo']['n_fft']))
-            window = np.hanning(N_samp)
-            spec, freqs, times = sneakyfft(data,N_samp,N_overlap,N_fft, window,fs_target)
+        match config['FFTInfo']['input_type']:
+            case 'point':
+                N_samp= int(config['FFTInfo']['n_samp'])
+                N_overlap = int(config['FFTInfo']['n_overlap'])
+                N_fft = int(config['FFTInfo']['n_fft'])
+                
+            case 'time':
+                N_samp= int(fs_target*float(config['FFTInfo']['n_samp']))
+                N_overlap = int(N_samp*float(config['FFTInfo']['n_overlap']))
+                N_fft = int(fs_target/float(config['FFTInfo']['n_fft']))
+                
+            case _:
+                raise TypeError('input must be either "point" or "time", if time, make sure divisions yield power of 2 for speed')
             
-        case _:
-            raise TypeError('input must be either "point" or "time", if time, make sure divisions yield power of 2 for speed')
+        window = np.hanning(N_samp)
+        spec, freqs, times = sneakyfft(data,N_samp,N_overlap,N_fft, window,fs_target)
+        savetype = config['SaveInfo']['data_type']
 
-    
+
 
     #saving info
     date = list_meta[0]['header']['time']
     fdate = datetime.datetime.fromtimestamp(int(date),tz = datetime.timezone.utc).strftime('%Y%m%dT%H%M%S')
-
+    odir = config['Append']['outputdir']
 
     if fileIDs[0] == config['Append']['first']:
-
-        freqname = os.path.join(config['Append']['outputdir'] , 'Dim_Frequency.txt')
+        freqname = os.path.join( odir, 'Dim_Frequency.txt')
         np.savetxt(freqname,freqs)
 
         channeldistance = list_meta[0]['appended']['channels'][chIDX]
-        channelname= os.path.join(config['Append']['outputdir'] ,'Dim_Channel.txt')
+        channelname= os.path.join(odir ,'Dim_Channel.txt')
         np.savetxt(channelname,channeldistance)
 
-        timename = os.path.join(config['Append']['outputdir'] , 'Dim_Time.txt')
+        timename = os.path.join(odir, 'Dim_Time.txt')
         np.savetxt(timename,times)
 
-        cfgname = os.path.join(config['Append']['outputdir'] , 'config.ini')
+        if savetype=='FK':
+            wnName = os.path.join(odir , 'Dim_Wavenumber.txt')
+            np.savetxt(wnName,WN)
+
+        cfgname = os.path.join(odir , 'config.ini')
         with open(cfgname, 'w') as configfile:
             config.write(configfile)
 
         
-    match config['SaveInfo']['data_type']: 
+    match savetype: 
         case 'magnitude':
-            magdir = os.path.join(config['Append']['outputdir'] , 'Magnitude')
+            magdir = os.path.join(odir , 'Magnitude')
             #Path(magdir).mkdir()
             os.makedirs(magdir, exist_ok=True)
             np.abs(spec,out = spec)
@@ -249,7 +262,7 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
 
             
         case 'complex':
-            compdir = os.path.join(config['Append']['outputdir'] , 'Complex')
+            compdir = os.path.join(odir , 'Complex')
             #Path(compdir).mkdir(exist_ok=True)
             os.makedirs(compdir, exist_ok=True)
             #spec = 10*np.log10(spec)
@@ -266,7 +279,7 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
                     break
                 f_idx = np.where(np.logical_and(freqs >= l,freqs <= h))
                 TX = 10*np.log10(np.mean(abs(spec[f_idx[0],:,:]),axis = 0))
-                cleandir = os.path.join(config['Append']['outputdir'] , str(l) + 'Hz_' + str(h) + 'Hz')
+                cleandir = os.path.join(odir , str(l) + 'Hz_' + str(h) + 'Hz')
                 #Path(cleandir).mkdir(exist_ok=True)
                 os.makedirs(cleandir, exist_ok= True)
                 fname = 'TX' + str(fs_target) + '_' + fdate +'Z'
@@ -274,7 +287,7 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
                 np.save(fout,TX)
 
         case 'LTSA':
-            LTSAdir = os.path.join(config['Append']['outputdir'] , 'LTSA')
+            LTSAdir = os.path.join(odir , 'LTSA')
             os.makedirs(LTSAdir, exist_ok=True)
             LTSA = np.mean(abs(spec),axis = 1)
             fname = 'FX_LTSA' + str(fs_target) + '_' + fdate +'Z'
@@ -282,11 +295,24 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
             np.save(data_name,LTSA)
         
         case 'entropy':
-            ENTdir = os.path.join(config['Append']['outputdir'] , 'Entropy')
+            ENTdir = os.path.join(odir , 'Entropy')
             os.makedirs(ENTdir,exist_ok=True)
+            np.abs(spec,out = spec)
+            entropy = Calder_utils.compute_entropy(spec)
+            fname = 'ENT' + str(fs_target) + '_' + fdate + 'Z'
+            data_name = os.path.join(ENTdir,fname)
+            np.save(data_name,entropy)
+
+        case 'FK':
+            FKDir = os.path.join(odir , 'FK')
+            os.makedirs(FKDir,exist_ok=True)
+            for fk in fks:
+                fname = 'FK' + str(fs_target) +'_T'+ str(fk[0][0]) + '_X' + str(fk[0][1]) + '_'+ fdate + 'Z'
+                data_name = os.path.join(FKDir,fname)
+                np.save(data_name,10*np.log10(fk[1]))
             
         case _:
-            raise TypeError('input must be either "magnitude", "complex","cleaning" ')
+            raise TypeError('input must be either "magnitude", "complex","cleaning","LTSA","Entropy", or doFk must be set to true')
 
 def DAS_processor():
     config = None
@@ -304,8 +330,6 @@ def DAS_processor():
         print(os.path.join(config['DataInfo']['Directory'], '*.hdf5'))
         #raise ValueError("Data files cannot be found, check path ends with slash")
     
-    
-
     if len(config['ProcessingInfo']['starttime'])>0:
         starttime = int(config['ProcessingInfo']['starttime'])
         stoptime = int(config['ProcessingInfo']['stoptime'])

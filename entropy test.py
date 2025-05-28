@@ -31,11 +31,13 @@ times = np.loadtxt("C:\\Users\\Calder\\Outputs\\BF_out_full_20250514T202112\\Dim
 for i,f in enumerate(files):
     name = os.path.basename(f).split('.')[0].split('_')[1]
     arr = np.load(f)
-    ent = compute_entropy(arr)
+    ent = 1-compute_entropy(arr)
+    ent -=np.min(ent)
+    ent /=np.max(ent)
     plt.figure()
-    plt.imshow(1-ent,aspect='auto', extent = (np.min(chans),np.max(chans),np.max(times),np.min(times)))
+    plt.imshow(ent,aspect='auto', extent = (np.min(chans),np.max(chans),np.max(times),np.min(times)))
     plt.colorbar()
-    plt.clim(0,0.1)
+    #plt.clim(0,0.1)
     fname = os.path.join(dst,name + '.png')
     plt.savefig(fname)
     plt.close()

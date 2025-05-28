@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 import glob
 import h5pydict
 import os
+from numpy.lib.stride_tricks import as_strided
 
 def faststack(X,n, wind = 1):
      """ fast adjacent channel stack through time
@@ -135,3 +136,47 @@ def window_rms(a, windowsize):
     a2 = np.square(a)
     window = np.ones(windowsize)/float(windowsize)
     return np.sqrt(np.convolve(a2, window, 'valid'))
+
+def compute_entropy(arr):
+    '''
+    computes the local timewise spectral entropy of FTX after prewhitening with the mean
+    inputs
+        arr: FTX np.array
+    outputs:
+        entropy: 2d np array
+        spectral entropy through time, relative to the timewise means of the FTX block, same dimension of TX
+    '''
+    arr = abs(arr)
+    arr /= np.mean(arr, axis = 1)[:,None,:] #prewhiten
+    arr /=np.sum(arr,axis = 0) #normalize to psd
+    denom = np.log2(arr.shape[0]-1)
+    num = np.sum(arr * np.log2(arr), axis = 0)
+    entropy = -num/denom
+    return entropy
+
+def sliding_window_FK(arr, window_shape):
+    step_y, step_x = window_shape[0] // 2, window_shape[1] // 2
+    shape = (
+        (arr.shape[0] - window_shape[0]) // step_y + 1,
+        (arr.shape[1] - window_shape[1]) // step_x + 1,
+        window_shape[0],
+        window_shape[1]
+    )
+    strides = (
+        arr.strides[0] * step_y,
+        arr.strides[1] * step_x,
+        arr.strides[0],
+        arr.strides[1]
+    )
+    
+    windows = as_strided(arr, shape=shape, strides=strides)
+    
+    results = []
+    for i in range(shape[0]):
+        for j in range(shape[1]):
+            win = windows[i, j]
+            fft_result = np.fft.fftshift(np.abs((np.fft.rfft2(win,axes = (-1,-2)))),axes = 1)
+            position = (i * step_y, j * step_x)
+            results.append((position, fft_result))
+    
+    return results
