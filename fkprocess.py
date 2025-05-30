@@ -59,35 +59,8 @@ import glob
 import os
 import matplotlib.pyplot as plt
 from scipy.signal import detrend, resample, butter, sosfiltfilt
-from numpy.lib.stride_tricks import as_strided
-
-def sliding_window_fft2d(arr, window_shape):
-    step_y, step_x = window_shape[0] // 2, window_shape[1] // 2
-    shape = (
-        (arr.shape[0] - window_shape[0]) // step_y + 1,
-        (arr.shape[1] - window_shape[1]) // step_x + 1,
-        window_shape[0],
-        window_shape[1]
-    )
-    strides = (
-        arr.strides[0] * step_y,
-        arr.strides[1] * step_x,
-        arr.strides[0],
-        arr.strides[1]
-    )
-    
-    windows = as_strided(arr, shape=shape, strides=strides)
-    
-    results = []
-    for i in range(shape[0]):
-        for j in range(shape[1]):
-            win = windows[i, j]
-            fft_result = np.fft.fftshift(np.abs((np.fft.rfft2(win,axes = (-1,-2)))),axes = 1)
-            position = (i * step_y, j * step_x)
-            results.append((position, fft_result))
-    
-    return results
-
+from Calder_utils import sliding_window_FK
+import imageio 
 
 files = ["C:\\Users\\Calder\\OneDrive - NTNU\\Desktop\\183137.hdf5"]
 dst = "C:\\Users\\Calder\\Outputs\\FKtest"
@@ -99,19 +72,22 @@ windowshape = (1024,2048)
 freqs = np.fft.rfftfreq(n=windowshape[0],d=dt)
 wavenumber= np.fft.fftshift(np.fft.fftfreq(n=windowshape[0],d=dx))
 
-fks = sliding_window_fft2d(signal,windowshape)
+fks = sliding_window_FK(signal,windowshape,overlap=1,rescale = True)
 del signal
 
 for i,f in enumerate(fks):
     relT = f[0][0] *dt
     cidx = f[0][1]
     channel = meta['header']['channels'][cidx]
-    plt.figure() 
-    plt.imshow(10*np.log10(f[1]), origin = 'lower',aspect = 'auto',extent = (np.min(wavenumber),np.max(wavenumber),np.min(freqs),np.max(freqs)))
+    # plt.figure() 
+    # plt.imshow(f[1], origin = 'lower',aspect = 'auto',extent = (np.min(wavenumber),np.max(wavenumber),np.min(freqs),np.max(freqs)))
     fname = os.path.join(dst,'FK_X' + str(channel) + '_T' + str(relT)+'.png')
-    plt.ylim(0,50)
-    plt.savefig(fname)
-    plt.close()
+    #array_2d_uint8 = (255 * f[1]).clip(0, 255).astype(np.uint8)
+    imageio.imwrite(fname,f[1])
+    #np.save(fname,array_2d_uint8)
+    # plt.ylim(0,50)
+    # plt.savefig(fname)
+    # plt.close()
 
 # %%
 #trying to vis some of the fks 
@@ -119,7 +95,7 @@ for i,f in enumerate(fks):
 import numpy as np
 import matplotlib.pyplot as plt
 
-tmp = np.load("C:\\Users\\Calder\\Outputs\\FK_test20250528T163924\\FK\\FK512_T0_X3072_20220821T180017Z.npy")
+tmp = np.load("C:\\Users\\Calder\\Outputs\\FK_test20250528T184907\\FK\\FK512_T0_X2048_20220821T180007Z.npy")
 plt.figure()
 plt.imshow(tmp, aspect = 'auto', origin = 'lower')
 

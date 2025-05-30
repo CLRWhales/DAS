@@ -13,7 +13,7 @@ import math
 import datetime
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from functools import partial
-
+import imageio
 
 #handling lack of tk on some linux distross. shoddy, need to fix in the future
 try:
@@ -159,7 +159,7 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
     data=detrend(data, axis=0, type='linear');
     dt_new = 1/fs_target
 
-    #filering
+    #filtering
     cuts = [float(config['FilterInfo']['lowcut']),float(config['FilterInfo']['highcut'])]
     dofilt = True
     
@@ -195,7 +195,9 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
     if config['FFTInfo'].getboolean('do_fk'):
         times = np.arange(data.shape[0])*dt_new
         windowshape = (int(config['FKInfo']['nfft_time']),int(config['FKInfo']['nfft_space']))
-        fks = Calder_utils.sliding_window_FK(data,windowshape)
+        overlap = int(config['FKInfo']['overlap'])
+        rsbool = config['FKInfo'].getboolean('rescale')
+        fks = Calder_utils.sliding_window_FK(data,windowshape,overlap,rsbool) 
         del data
         freqs = np.fft.rfftfreq(n=windowshape[0],d=dt_new)
         WN = np.fft.fftshift(np.fft.fftfreq(n=windowshape[1],d=dx))
@@ -304,12 +306,12 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
             np.save(data_name,entropy)
 
         case 'FK':
-            FKDir = os.path.join(odir , 'FK')
+            FKDir = os.path.join(odir , 'FK',fdate + 'Z')
             os.makedirs(FKDir,exist_ok=True)
             for fk in fks:
-                fname = 'FK' + str(fs_target) +'_T'+ str(fk[0][0]) + '_X' + str(fk[0][1]) + '_'+ fdate + 'Z'
+                fname = 'FK' + str(fs_target) +'_T'+ str(fk[0][0]) + '_X' + str(fk[0][1]) + '_'+ fdate + 'Z.png'
                 data_name = os.path.join(FKDir,fname)
-                np.save(data_name,10*np.log10(fk[1]))
+                imageio.imwrite(data_name,fk[1])
             
         case _:
             raise TypeError('input must be either "magnitude", "complex","cleaning","LTSA","Entropy", or doFk must be set to true')

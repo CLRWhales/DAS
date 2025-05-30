@@ -154,8 +154,8 @@ def compute_entropy(arr):
     entropy = -num/denom
     return entropy
 
-def sliding_window_FK(arr, window_shape):
-    step_y, step_x = window_shape[0] // 2, window_shape[1] // 2
+def sliding_window_FK(arr, window_shape,overlap = 2, rescale = False):
+    step_y, step_x = window_shape[0] // overlap, window_shape[1] // overlap
     shape = (
         (arr.shape[0] - window_shape[0]) // step_y + 1,
         (arr.shape[1] - window_shape[1]) // step_x + 1,
@@ -176,7 +176,16 @@ def sliding_window_FK(arr, window_shape):
         for j in range(shape[1]):
             win = windows[i, j]
             fft_result = np.fft.fftshift(np.abs((np.fft.rfft2(win,axes = (-1,-2)))),axes = 1)
-            position = (i * step_y, j * step_x)
-            results.append((position, fft_result))
-    
+            if rescale:
+                np.log10(fft_result,out = fft_result)
+                fft_result *=10
+                fft_result -=np.min(fft_result)
+                fft_result /=np.max(fft_result)
+                array_2d_uint8 = (255 * fft_result).clip(0, 255).astype(np.uint8)
+                position = (i * step_y, j * step_x)
+                results.append((position, array_2d_uint8))
+            else:
+                position = (i * step_y, j * step_x)
+                results.append((position, fft_result))
+
     return results

@@ -20,7 +20,7 @@ config['FFTInfo'] = {'input_type':'time', #unit for fft parameter definition (ti
                      'n_fft':'0.5', #if time, Hz resoltuion of spectrogram, if points, n points to include, will add zero padding if necessary
                      'n_overlap':'0.5', #if time, seconds of window overlap, if points, n points to overlap
                      'n_samp':'0.5', #if time, how may seconds of data to include, if points, how many points to use
-                     'do_fk':'false' #do yo uwant to do 1D FFT or 'FK'
+                     'do_fk':'false' #do you want to do 1D FFT or 'FK'
                      }
 config['SaveInfo'] = {'directory':'your/direcotry/here', #general directory to save the data within
                       'run_name':'test', # run name to save within the above directory
@@ -33,8 +33,10 @@ config['FilterInfo'] = {'type':'highpass', #can be highpass, lowpass, bandpass, 
                         'zerophase':'0', #filter zerophase
                         'alphataper':'0.1' #curently doesnt do anything
                         }
-config['FKInfo'] = {'nfft_time':'1024', #parameters in units of samples for the fk transform (how many time points)
-                    'nfft_space':'2056',#how many channel to include, both should be a power of 2 for speed
+config['FKInfo'] = {'nfft_time':'1024', #parameters in units of samples for the fk transform (how many time points) (applied after resampling)
+                    'nfft_space':'2056', #how many channel to include, both should be a power of 2 for speed (applied after any stacking)
+                    'rescale':'true',
+                    'overlap':'2'
                     }
 
 with open('example.ini', 'w') as configfile:
