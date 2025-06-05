@@ -68,35 +68,39 @@ signal,meta = load_DAS_file(files[0])
 
 dt = meta['header']['dt']
 dx = 4
-windowshape = (1024,2048)
+windowshape = (512,512)
 freqs = np.fft.rfftfreq(n=windowshape[0],d=dt)
 wavenumber= np.fft.fftshift(np.fft.fftfreq(n=windowshape[0],d=dx))
 
-fks = sliding_window_FK(signal,windowshape,overlap=1,rescale = True)
+fks = sliding_window_FK(signal,windowshape,overlap=1,rescale = False)
 del signal
 
-for i,f in enumerate(fks):
-    relT = f[0][0] *dt
-    cidx = f[0][1]
-    channel = meta['header']['channels'][cidx]
-    # plt.figure() 
-    # plt.imshow(f[1], origin = 'lower',aspect = 'auto',extent = (np.min(wavenumber),np.max(wavenumber),np.min(freqs),np.max(freqs)))
-    fname = os.path.join(dst,'FK_X' + str(channel) + '_T' + str(relT)+'.png')
-    #array_2d_uint8 = (255 * f[1]).clip(0, 255).astype(np.uint8)
-    imageio.imwrite(fname,f[1])
-    #np.save(fname,array_2d_uint8)
-    # plt.ylim(0,50)
-    # plt.savefig(fname)
-    # plt.close()
+# for i,f in enumerate(fks):
+#     relT = f[0][0]
+#     cidx = f[0][1]
+#     channel = meta['header']['channels'][cidx]
+#     # plt.figure() 
+#     # plt.imshow(f[1], origin = 'lower',aspect = 'auto',extent = (np.min(wavenumber),np.max(wavenumber),np.min(freqs),np.max(freqs)))
+#     fname = os.path.join(dst,'FK_X' + str(channel) + '_T' + str(relT)+'.png')
+#     #array_2d_uint8 = (255 * f[1]).clip(0, 255).astype(np.uint8)
+#     imageio.imwrite(fname,f[1])
+#     #np.save(fname,array_2d_uint8)
+#     # plt.ylim(0,50)
+#     # plt.savefig(fname)
+#     # plt.close()
 
-# %%
-#trying to vis some of the fks 
+#%%compute the entropy of these things on a per file basesis
 
-import numpy as np
-import matplotlib.pyplot as plt
-
-tmp = np.load("C:\\Users\\Calder\\Outputs\\FK_test20250528T184907\\FK\\FK512_T0_X2048_20220821T180007Z.npy")
+fk_l2norm = np.sqrt(np.mean([np.square(f[1]) for f in fks],axis = 0))
+fk_whitened = [f[1]/fk_l2norm for f in fks]
+fk_zerosum = [f/np.sum(f) for f in fk_whitened]
+ent = [-np.sum(f*np.log2(f))/np.log2(f.size) for f in fk_zerosum]
+ent = [1-e for e in ent]
+rt = [f[0][0]*dt for f in fks]
+rx = [f[0][1]*dx for f in fks]
 plt.figure()
-plt.imshow(tmp, aspect = 'auto', origin = 'lower')
-
+plt.scatter(rx,rt,c = ent)
+plt.colorbar()
+plt.xlabel('fiber distance (m)')
+plt.ylabel('time')
 # %%

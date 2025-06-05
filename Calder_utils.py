@@ -175,10 +175,11 @@ def sliding_window_FK(arr, window_shape,overlap = 2, rescale = False):
     for i in range(shape[0]):
         for j in range(shape[1]):
             win = windows[i, j]
-            fft_result = np.fft.fftshift(np.abs((np.fft.rfft2(win,axes = (-1,-2)))),axes = 1)
+            fft_result = np.fft.fftshift(np.abs((np.fft.rfft2(win,axes = (-1,-2)))),axes = 1)[:-1,:] #this removes the time nyquist row from the data
             if rescale:
                 np.log10(fft_result,out = fft_result)
                 fft_result *=10
+                fft_result /= np.sqrt(np.mean(np.square(fft_result)))
                 fft_result -=np.min(fft_result)
                 fft_result /=np.max(fft_result)
                 array_2d_uint8 = (255 * fft_result).clip(0, 255).astype(np.uint8)
@@ -186,6 +187,7 @@ def sliding_window_FK(arr, window_shape,overlap = 2, rescale = False):
                 results.append((position, array_2d_uint8))
             else:
                 position = (i * step_y, j * step_x)
-                results.append((position, fft_result))
+                idx = (i,j)
+                results.append((position, fft_result,idx))
 
     return results

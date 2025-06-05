@@ -8,6 +8,7 @@ config['DataInfo'] = {'Directory':'your/directory/here', #directory to where the
                       }
 config['ProcessingInfo'] = {'n_synthetic':'auto', # number of synthetic receiver positions to be used along the fiber, auto means fill it up acording to synthetic spacing, meters means auto, but spacing is in units of meters and auto fills the full extent of the fiber.
                             'synthetic_spacing':'250', #number of channels between the start of each synthetic receiver
+                            'c_start':'0', #where to start the channel idx along the fiber? idx or meters as described above
                             'n_stack':'5', #how many chanels to use within one synthetic receiver
                             'stack':'true', #do you want to stack these channels
                             'stackaxis':'1', #along which axis do you want to stack, keep to 1 to avoid bugs

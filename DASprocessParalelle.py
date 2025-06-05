@@ -359,17 +359,18 @@ def DAS_processor():
         case 'auto':
             spacing = int(config['ProcessingInfo']['synthetic_spacing'])
             nstack = int(config['ProcessingInfo']['n_stack'])
-            
+            c_start = int(config['ProcessingInfo']['c_start'])
             n_synthetic = np.floor(len(chans)/spacing)
             n_synthetic = int(n_synthetic)
             for i in range(n_synthetic):
-                channels.extend([x+i*spacing for x in range(0,nstack)])
-            channels[:] = [x for x in channels if x <= np.max(chans)]
+                channels.extend([x+(i*spacing)+c_start for x in range(0,nstack)])
+            channels[:] = [x for x in channels if x <= len(chans)-1]
 
         case 'meter':
             dx = int(chans[1]-chans[0])
             spacing = int(np.rint(int(config['ProcessingInfo']['synthetic_spacing'])/dx))
             nstack = int(config['ProcessingInfo']['n_stack'])
+            c_start = int(np.rint(int(config['ProcessingInfo']['c_start'])/dx))
             n_synthetic = np.floor(len(chans)/spacing)
             n_synthetic = int(n_synthetic)
 
@@ -378,15 +379,15 @@ def DAS_processor():
                 print('reducing stack size to fit in spacing.')
             
             for i in range(n_synthetic):
-                channels.extend([x+i*spacing for x in range(0,nstack)])
-            channels[:] = [x for x in channels if x <= np.max(chans)]
+                channels.extend([x+(i*spacing)+c_start for x in range(0,nstack)])
+            channels[:] = [x for x in channels if x <= len(chans)-1]
 
         case _:
+            c_start = int(config['ProcessingInfo']['c_start'])
             for i in range(int(config['ProcessingInfo']['n_synthetic'])):
-                channels.extend([x+i*int(config['ProcessingInfo']['synthetic_spacing']) for x in range(0,int(config['ProcessingInfo']['n_stack']))])
-            channels[:] = [x for x in channels if x <= np.max(chans)]
-
-
+                channels.extend([x+(i*int(config['ProcessingInfo']['synthetic_spacing']))+c_start for x in range(0,int(config['ProcessingInfo']['n_stack']))])
+            channels[:] = [x for x in channels if x <= len(chans)-1]
+    
     n_workers = int(config['DataInfo']['n_workers'])
     verbose = config['ProcessingInfo'].getboolean('verbose')
     path_data = config['DataInfo']['directory'] 
