@@ -179,15 +179,15 @@ def sliding_window_FK(arr, window_shape,overlap = 2, rescale = False):
             if rescale:
                 np.log10(fft_result,out = fft_result)
                 fft_result *=10
-                fft_result /= np.sqrt(np.mean(np.square(fft_result)))
-                fft_result -=np.min(fft_result)
-                fft_result /=np.max(fft_result)
+                min = np.floor(np.min(fft_result))
+                fft_result -=min
+                max = np.ceil(np.max(fft_result))
+                fft_result /=max
                 array_2d_uint8 = (255 * fft_result).clip(0, 255).astype(np.uint8)
                 position = (i * step_y, j * step_x)
-                results.append((position, array_2d_uint8))
+                results.append((position, array_2d_uint8,max,min))
             else:
                 position = (i * step_y, j * step_x)
-                idx = (i,j)
-                results.append((position, fft_result,idx))
+                results.append((position, fft_result))
 
     return results

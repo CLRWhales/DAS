@@ -309,7 +309,7 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
             FKDir = os.path.join(odir , 'FK',fdate + 'Z')
             os.makedirs(FKDir,exist_ok=True)
             for fk in fks:
-                fname = 'FK' + str(fs_target) +'_T'+ str(fk[0][0]) + '_X' + str(fk[0][1]) + '_'+ fdate + 'Z.png'
+                fname = 'FK' + str(fs_target) +'_T'+ str(fk[0][0]) + '_X' + str(fk[0][1]) + '_M' + str(fk[2]) + '_m'+str(fk[3])+'_'+ fdate + 'Z.png'
                 data_name = os.path.join(FKDir,fname)
                 imageio.imwrite(data_name,fk[1])
             
