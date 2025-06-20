@@ -15,7 +15,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 from functools import partial
 import imageio
 
-#handling lack of tk on some linux distross. shoddy, need to fix in the future
+#handling lack of tk on some linux distros. shoddy, need to fix in the future
 try:
     import tkinter as tk
 except ImportError:
@@ -124,15 +124,25 @@ def preprocess_DAS(data, list_meta, unwr=True, integrate=True, useSensitivity=Tr
 
 def LPS_block(path_data,channels,verbose,config, fileIDs):
     """
-    Load, Process, and Save, a single block of das data files into FTX for further analysis and visualization 
+    Load, Process, and Save, a single block of das data files for further analysis and visualization 
     """
     #load into list
+    do_fk = config['FFTInfo'].getboolean('do_fk')
+
+    # if do_fk:
+    #     FKchans = channels
+    #     channels = None
+
     list_data, list_meta, _ = load_files(path_data = path_data,
                                       channels = channels,
                                       verbose = verbose,
                                       fileIDs= fileIDs)
     data =  np.concatenate(list_data, axis=0)
     data, list_meta = preprocess_DAS(data, list_meta)
+
+    # if do_fk:
+    #     data = data[:,FKchans]
+
     data /= 10E-9 #scaling into units of strain is handled, this moves it to nano strain? 
 
     #do stacking
@@ -155,6 +165,10 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
 
     num = data.shape[0]/(1/fs_target)*dt
     num = num.astype(int)
+
+    #perfomring some lowpass AA filtering
+    sos1 = butter(N = 6,Wn = fs_target/2, btype='low', fs = 1/dt, output= 'sos')
+    data = sosfiltfilt(sos1,data,axis = 0)
     data = resample(data,num ,axis = 0);
     data=detrend(data, axis=0, type='linear');
     dt_new = 1/fs_target
@@ -192,7 +206,7 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
                         axis = 0)
         
     
-    if config['FFTInfo'].getboolean('do_fk'):
+    if do_fk:
         times = np.arange(data.shape[0])*dt_new
         windowshape = (int(config['FKInfo']['nfft_time']),int(config['FKInfo']['nfft_space']))
         overlap = int(config['FKInfo']['overlap'])
@@ -202,6 +216,7 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
         freqs = np.fft.rfftfreq(n=windowshape[0],d=dt_new)
         WN = np.fft.fftshift(np.fft.fftfreq(n=windowshape[1],d=dx))
         savetype = 'FK'
+        # chIDX = FKchans
     else:
     # STFT 
         match config['FFTInfo']['input_type']:
@@ -221,7 +236,7 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
         window = np.hanning(N_samp)
         spec, freqs, times = sneakyfft(data,N_samp,N_overlap,N_fft, window,fs_target)
         savetype = config['SaveInfo']['data_type']
-
+        del data
 
 
     #saving info
@@ -309,9 +324,10 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
             FKDir = os.path.join(odir , 'FK',fdate + 'Z')
             os.makedirs(FKDir,exist_ok=True)
             for fk in fks:
-                fname = 'FK' + str(fs_target) +'_T'+ str(fk[0][0]) + '_X' + str(fk[0][1]) + '_M' + str(fk[2]) + '_m'+str(fk[3])+'_'+ fdate + 'Z.png'
+                fname = 'T'+ str(fk[1][0]) + '_X' + str(fk[1][1]) + '_F' + str(fk[2][0]) + '_K' +str(fk[2][1]) +'_V'+ str(fk[3])+ '_' + fdate + 'Z.png'
                 data_name = os.path.join(FKDir,fname)
-                imageio.imwrite(data_name,fk[1])
+                #print(fk[1].dtype)
+                imageio.imwrite(data_name,fk[0])
             
         case _:
             raise TypeError('input must be either "magnitude", "complex","cleaning","LTSA","Entropy", or doFk must be set to true')
@@ -352,7 +368,10 @@ def DAS_processor():
     channels = []
     meta = Calder_utils.load_meta(firstfile)
     chans = meta['header']['channels']
-    match config['ProcessingInfo']['n_synthetic']:
+
+    n_synth = config['ProcessingInfo']['n_synthetic']
+    
+    match n_synth:
         case '-1':
             channels = None
 

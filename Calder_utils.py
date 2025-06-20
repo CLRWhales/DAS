@@ -6,6 +6,8 @@ import glob
 import h5pydict
 import os
 from numpy.lib.stride_tricks import as_strided
+import scipy.ndimage as NDI
+
 
 def faststack(X,n, wind = 1):
      """ fast adjacent channel stack through time
@@ -154,6 +156,63 @@ def compute_entropy(arr):
     entropy = -num/denom
     return entropy
 
+def compute_FK_speed(k, f):
+    """
+    Computes angle and slope from a reference cell to every other cell in a 2D grid.
+
+    Parameters:
+        k (2D np.array): array of  of x positions.
+        f (2D np.array): Grid of y positions.
+
+    Returns:
+        angle_grid (2D np.array): Angles in radians.
+        slope_grid (2D np.array): Slopes (np.inf for vertical lines).
+    """
+    x,y = np.meshgrid(k,f)
+    angle_grid = np.arctan2(y, x)
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        slope_grid = np.true_divide(y, abs(x))
+        slope_grid[x == 0] = np.inf  # handle vertical lines
+
+    return  slope_grid,angle_grid
+
+
+def average_values_by_slope_bins(slope_grid, value_grid, slope_bins):
+    """
+    Computes average of values from value_grid based on slope bins.
+
+    Parameters:
+        slope_grid (2D np.array): Array of slope values.
+        value_grid (2D np.array): Array of values to average.
+        slope_bins (1D np.array): Array defining slope bin edges.
+
+    Returns:
+        averages (1D np.array): Average of values in each slope bin.
+        counts (1D np.array): Number of values in each bin.
+    """
+    slopes_flat = slope_grid.flatten()
+    values_flat = value_grid.flatten()
+
+    bin_indices = np.digitize(slopes_flat, slope_bins) - 1  # 0-based bins
+
+    # Mask for valid values (finite slopes and values)
+    mask = np.isfinite(slopes_flat) & np.isfinite(values_flat)
+    slopes_flat = slopes_flat[mask]
+    values_flat = values_flat[mask]
+    bin_indices = bin_indices[mask]
+
+    # Sum of values and count per bin
+    bin_sums = np.bincount(bin_indices, weights=values_flat, minlength=len(slope_bins) - 1)
+    bin_counts = np.bincount(bin_indices, minlength=len(slope_bins) - 1)
+
+    # Avoid divide by zero
+    with np.errstate(divide='ignore', invalid='ignore'):
+        averages = np.true_divide(bin_sums, bin_counts)
+        averages[bin_counts == 0] = np.nan  # Or set to 0, or leave as NaN
+
+    return averages
+
 def sliding_window_FK(arr, window_shape,overlap = 2, rescale = False):
     step_y, step_x = window_shape[0] // overlap, window_shape[1] // overlap
     shape = (
@@ -170,24 +229,61 @@ def sliding_window_FK(arr, window_shape,overlap = 2, rescale = False):
     )
     
     windows = as_strided(arr, shape=shape, strides=strides)
-    
-    results = []
-    for i in range(shape[0]):
-        for j in range(shape[1]):
-            win = windows[i, j]
-            fft_result = np.fft.fftshift(np.abs((np.fft.rfft2(win,axes = (-1,-2)))),axes = 1)[:-1,:] #this removes the time nyquist row from the data
-            if rescale:
-                np.log10(fft_result,out = fft_result)
-                fft_result *=10
-                min = np.floor(np.min(fft_result))
-                fft_result -=min
-                max = np.ceil(np.max(fft_result))
-                fft_result /=max
-                array_2d_uint8 = (255 * fft_result).clip(0, 255).astype(np.uint8)
-                position = (i * step_y, j * step_x)
-                results.append((position, array_2d_uint8,max,min))
-            else:
-                position = (i * step_y, j * step_x)
-                results.append((position, fft_result))
+    weight = np.outer(np.hanning(window_shape[0]),np.hanning(window_shape[1]))
 
-    return results
+    velweights = np.hanning(7)
+    velweights = velweights/np.sum(velweights)
+
+    ks = np.fft.fftshift(np.fft.fftfreq(512,12))
+    freqs = np.fft.rfftfreq(512,1/256)[1:]
+    slope,_ = compute_FK_speed(ks,freqs)
+
+    slopebins = np.linspace(0,10000,num = 101)
+    centers = 0.5* (slopebins[:-1] + slopebins[1:])
+    slopebins[0] = -np.inf
+    slopebins[-1] = np.inf
+
+    #acumulators
+    results = []
+    pos = []
+    maxs = []
+    vels = []
+
+    for j in range(shape[1]): #range
+        map = np.zeros(shape = (int(window_shape[0]/2),window_shape[1]))
+        N = 0
+        intermediate = []
+        for i in range(shape[0]): #time
+            win = windows[i, j]*weight
+            fft_result = np.fft.fftshift(np.abs((np.fft.rfft2(win,axes=(-1,-2),norm = 'forward'))),axes=1)[1:,:] #this removes the time nyquist row from the data
+            pos.append((i * step_y, j * step_x))
+            map = map+fft_result
+            intermediate.append(fft_result)
+            N = N+1
+        
+        mean_img = map/N
+        stdev = np.std(intermediate)
+
+        for f in intermediate:
+            tmp= NDI.gaussian_filter((f-mean_img)/stdev,sigma=(1,2))
+            peak_lock = np.unravel_index(np.argmax(tmp), tmp.shape)
+            maxs.append(peak_lock)
+            averages = average_values_by_slope_bins(slope,tmp,slopebins)
+            averages= np.convolve(averages,velweights,mode='same')
+            vel = centers[np.argmax(averages)]
+            vels.append(vel)
+
+        results.extend(20*np.log10(intermediate))
+
+    if rescale:
+  
+        low = np.floor(np.percentile(results,1)) #file wise
+        high = np.ceil(np.percentile(results,99)) #filewise
+        results = [(255*((r-low)/(high-low))).clip(0, 255).astype(np.uint8) for r in results]
+
+
+    outputs = [(k[0],k[1],k[2],k[3]) for k in zip(results,pos,maxs,vels)]
+
+    return outputs
+
+

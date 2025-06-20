@@ -62,17 +62,16 @@ from scipy.signal import detrend, resample, butter, sosfiltfilt
 from Calder_utils import sliding_window_FK
 import imageio 
 
-files = ["C:\\Users\\Calder\\OneDrive - NTNU\\Desktop\\183137.hdf5"]
-dst = "C:\\Users\\Calder\\Outputs\\FKtest"
+files = ["E:\\NORSAR01v2\\20220821\\dphi\\183537.hdf5"]
 signal,meta = load_DAS_file(files[0])
-
+signal = signal[:,::3]
 dt = meta['header']['dt']
 dx = 4
 windowshape = (512,512)
 freqs = np.fft.rfftfreq(n=windowshape[0],d=dt)
 wavenumber= np.fft.fftshift(np.fft.fftfreq(n=windowshape[0],d=dx))
 
-fks = sliding_window_FK(signal,windowshape,overlap=1,rescale = False)
+fks = sliding_window_FK(signal,windowshape,overlap=1,rescale = True)
 del signal
 
 # for i,f in enumerate(fks):
@@ -91,16 +90,7 @@ del signal
 
 #%%compute the entropy of these things on a per file basesis
 
-fk_l2norm = np.sqrt(np.mean([np.square(f[1]) for f in fks],axis = 0))
-fk_whitened = [f[1]/fk_l2norm for f in fks]
-fk_zerosum = [f/np.sum(f) for f in fk_whitened]
-ent = [-np.sum(f*np.log2(f))/np.log2(f.size) for f in fk_zerosum]
-ent = [1-e for e in ent]
-rt = [f[0][0]*dt for f in fks]
-rx = [f[0][1]*dx for f in fks]
 plt.figure()
-plt.scatter(rx,rt,c = ent)
+plt.imshow(fks[15][1])
 plt.colorbar()
-plt.xlabel('fiber distance (m)')
-plt.ylabel('time')
 # %%
