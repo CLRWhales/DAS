@@ -15,7 +15,8 @@ config['ProcessingInfo'] = {'n_synthetic':'auto', # number of synthetic receiver
                             'fs_target' : 'auto', #resample the data in time to this, auto moves it to the highest power of 2
                             'starttime' : '', #optional, in the format HHMMSS if you only want to process some of the data
                             'stoptime': '', # optional, in the format HHMMSS, if you only want to process some of the data
-                            'verbose': 'false' # diagnositic information during the run, troubleshooting only
+                            'verbose': 'false', # diagnositic information during the run, troubleshooting only
+                            'cmn_filt': 'true'
                             }
 config['FFTInfo'] = {'input_type':'time', #unit for fft parameter definition (time, point)
                      'n_fft':'0.5', #if time, Hz resoltuion of spectrogram, if points, n points to include, will add zero padding if necessary
@@ -37,7 +38,8 @@ config['FilterInfo'] = {'type':'highpass', #can be highpass, lowpass, bandpass, 
 config['FKInfo'] = {'nfft_time':'1024', #parameters in units of samples for the fk transform (how many time points) (applied after resampling)
                     'nfft_space':'2056', #how many channel to include, both should be a power of 2 for speed (applied after any stacking)
                     'rescale':'true',
-                    'overlap':'2'
+                    'overlap':'2',
+                    'fold':'true'
                     }
 
 with open('example.ini', 'w') as configfile:

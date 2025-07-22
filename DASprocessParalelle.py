@@ -14,7 +14,6 @@ import datetime
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from functools import partial
 import imageio
-
 #handling lack of tk on some linux distros. shoddy, need to fix in the future
 try:
     import tkinter as tk
@@ -145,6 +144,8 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
 
     data /= 10E-9 #scaling into units of strain is handled, this moves it to nano strain? 
 
+    if config['ProcessingInfo'].getboolean('cmn_filt'):
+        data-=np.mean(data,axis = 1)[:,None]
     #do stacking
     n_stack = int(config['ProcessingInfo']['n_stack'])
     chans = list_meta[0]['appended']['channels']
@@ -211,7 +212,8 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
         windowshape = (int(config['FKInfo']['nfft_time']),int(config['FKInfo']['nfft_space']))
         overlap = int(config['FKInfo']['overlap'])
         rsbool = config['FKInfo'].getboolean('rescale')
-        fks = Calder_utils.sliding_window_FK(data,windowshape,overlap,rsbool) 
+        fold= config['FKInfo'].getboolean('fold')
+        fks = Calder_utils.sliding_window_FK(data,windowshape,overlap,rsbool,fold) 
         del data
         freqs = np.fft.rfftfreq(n=windowshape[0],d=dt_new)
         WN = np.fft.fftshift(np.fft.fftfreq(n=windowshape[1],d=dx))
@@ -257,6 +259,9 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
 
         if savetype=='FK':
             wnName = os.path.join(odir , 'Dim_Wavenumber.txt')
+            pname = os.path.join(odir,'Dim_max.txt')
+            posmax = fks[-1][1] + (fs_target,)
+            np.savetxt(pname,posmax)
             np.savetxt(wnName,WN)
 
         cfgname = os.path.join(odir , 'config.ini')
@@ -324,10 +329,11 @@ def LPS_block(path_data,channels,verbose,config, fileIDs):
             FKDir = os.path.join(odir , 'FK',fdate + 'Z')
             os.makedirs(FKDir,exist_ok=True)
             for fk in fks:
-                fname = 'T'+ str(fk[1][0]) + '_X' + str(fk[1][1]) + '_F' + str(fk[2][0]) + '_K' +str(fk[2][1]) +'_V'+ str(fk[3])+ '_' + fdate + 'Z.png'
+                fname = 'FS'+str(fs_target)+'_T'+ str(fk[1][0]) + '_X' + str(fk[1][1]) + '_F' + str(fk[2][0]) + '_K' +str(fk[2][1]) +'_V'+ str(fk[3])+ '_L'+str(fk[4]) + '_' + fdate + 'Z.png'
                 data_name = os.path.join(FKDir,fname)
                 #print(fk[1].dtype)
                 imageio.imwrite(data_name,fk[0])
+                
             
         case _:
             raise TypeError('input must be either "magnitude", "complex","cleaning","LTSA","Entropy", or doFk must be set to true')

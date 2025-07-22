@@ -94,3 +94,55 @@ plt.scatter(vel,np.max(averages), color = 'red')
 print(vel)
 
 # %%
+import imageio
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+
+path = "D:\\DAS\\FK\\peaktest20250626T142743\\FK\\20220821T183537Z\\T0_X1536_F94_K150.0_V1946.0_20220821T183537Z.png"
+freqs = np.fft.rfftfreq(n = 512,d = 1/256)[1:]
+ks = np.fft.rfftfreq(n = 512, d = 12)[1:]
+img = imageio.imread(path)
+plt.figure()
+plt.imshow(img[:,:,0], origin = 'lower', extent = (np.min(ks),np.max(ks),np.min(freqs), np.max(freqs)), aspect = 'auto')
+
+plt.figure()
+plt.imshow(img[:,:,1], origin = 'lower', extent = (np.min(ks),np.max(ks),np.min(freqs), np.max(freqs)), aspect = 'auto')
+
+
+height, width,n = img.shape
+
+
+# Circle parameters
+radius = 256
+cx= 0
+cy = 0 
+Y, X = np.ogrid[:height, :width]
+mask = ((X - cy) ** 2 + (Y - cx) ** 2 <= radius ** 2) #& (Y >= cx)
+
+c_min = 1400
+c_max = 4000
+f = np.fft.rfftfreq(512, d = 1/256)[1:]
+k = np.fft.rfftfreq(512, d = 12)[1:]
+ff,kk = np.meshgrid(f,k)
+
+g = 1.0*((ff < kk*c_min))
+g2 = 1.0*((ff < kk*c_max))
+
+# g = g + np.fliplr(g)
+# g2 = g2 + np.fliplr(g2)
+g = (g2-g).T*mask
+
+img = img*g[:,:,None]
+plt.figure()
+plt.imshow(mask)
+
+plt.figure()
+plt.imshow(img[:,:,0], origin = 'lower', extent = (np.min(ks),np.max(ks),np.min(freqs), np.max(freqs)), aspect = 'auto')
+
+plt.figure()
+plt.imshow(img[:,:,1], origin = 'lower', extent = (np.min(ks),np.max(ks),np.min(freqs), np.max(freqs)), aspect = 'auto')
+
+
+# %%

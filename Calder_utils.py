@@ -7,6 +7,7 @@ import h5pydict
 import os
 from numpy.lib.stride_tricks import as_strided
 import scipy.ndimage as NDI
+from scipy.stats import entropy
 
 
 def faststack(X,n, wind = 1):
@@ -213,7 +214,27 @@ def average_values_by_slope_bins(slope_grid, value_grid, slope_bins):
 
     return averages
 
-def sliding_window_FK(arr, window_shape,overlap = 2, rescale = False):
+def foldFK(fk,K):
+    negs = np.where(K<0)[0]
+    pos = np.where(K>0)[0]
+    negV = fk[:,negs]
+    posV = fk[:,pos]
+    negV = np.fliplr(negV)
+    posV = np.append(posV,negV[:,-1:],axis = 1)
+    return np.stack([posV,negV],axis = -1)
+
+def KL_div(imglist):
+    mi = np.min(imglist)
+    ma = np.max(imglist)
+    total,_ = np.histogram(np.concat(imglist).flatten(),bins = 128,range=(mi,ma),density = True)
+    total+=1e-15
+    total /= np.sum(total)
+    hists= [np.histogram(im.flatten(),bins = 128,range = (mi,ma), density = True) for im in imglist]
+    hists = [(h[0]+1e-15)/np.sum((h[0]+1e-15)) for h in hists]
+    ents = [np.round(entropy(fk,total),6)for fk in hists]
+    return ents
+
+def sliding_window_FK(arr, window_shape,overlap = 2, rescale = False, fold = True):
     step_y, step_x = window_shape[0] // overlap, window_shape[1] // overlap
     shape = (
         (arr.shape[0] - window_shape[0]) // step_y + 1,
@@ -237,6 +258,7 @@ def sliding_window_FK(arr, window_shape,overlap = 2, rescale = False):
     ks = np.fft.fftshift(np.fft.fftfreq(512,12))
     freqs = np.fft.rfftfreq(512,1/256)[1:]
     slope,_ = compute_FK_speed(ks,freqs)
+    slope[slope > 10000] = 10000
 
     slopebins = np.linspace(0,10000,num = 101)
     centers = 0.5* (slopebins[:-1] + slopebins[1:])
@@ -247,7 +269,19 @@ def sliding_window_FK(arr, window_shape,overlap = 2, rescale = False):
     results = []
     pos = []
     maxs = []
+    Ls = []
     vels = []
+    entfull = []
+    flags = []
+
+    # c_min = 1000
+    # c_max = 5000
+    # f = np.fft.rfftfreq(512, d = 1/256)[1:]
+    # k1 = np.fft.fftshift(np.fft.fftfreq(512, d = 12))
+    # kk,ff = np.meshgrid(k1,f)
+    # slow = ff<np.abs(kk*c_min)
+    # fast = ff > np.abs(kk*c_max)
+    # full = slow+fast
 
     for j in range(shape[1]): #range
         map = np.zeros(shape = (int(window_shape[0]/2),window_shape[1]))
@@ -255,7 +289,7 @@ def sliding_window_FK(arr, window_shape,overlap = 2, rescale = False):
         intermediate = []
         for i in range(shape[0]): #time
             win = windows[i, j]*weight
-            fft_result = np.fft.fftshift(np.abs((np.fft.rfft2(win,axes=(-1,-2),norm = 'forward'))),axes=1)[1:,:] #this removes the time nyquist row from the data
+            fft_result = np.fft.fftshift(np.abs((np.fft.rfft2(win,axes=(-1,-2),norm = 'forward'))),axes=1)[1:,:]#this removes time DC offset
             pos.append((i * step_y, j * step_x))
             map = map+fft_result
             intermediate.append(fft_result)
@@ -265,25 +299,40 @@ def sliding_window_FK(arr, window_shape,overlap = 2, rescale = False):
         stdev = np.std(intermediate)
 
         for f in intermediate:
-            tmp= NDI.gaussian_filter((f-mean_img)/stdev,sigma=(1,2))
+            tmp= NDI.gaussian_filter((f-mean_img)/stdev,sigma=(1))
             peak_lock = np.unravel_index(np.argmax(tmp), tmp.shape)
-            maxs.append(peak_lock)
-            averages = average_values_by_slope_bins(slope,tmp,slopebins)
-            averages= np.convolve(averages,velweights,mode='same')
-            vel = centers[np.argmax(averages)]
-            vels.append(vel)
+            fmax=peak_lock[0]
+            kmax = np.round(np.abs(peak_lock[1]-window_shape[1]/2))
+            L = int((peak_lock[1]-window_shape[1]/2)<0)
+            Ls.append(L)
+            maxs.append((fmax,kmax))
+            vels.append(np.round(slope[peak_lock]))
 
+        # tmp = [fk[~full].flatten() for fk in intermediate]
+        # ents = KL_div(20*np.log10(tmp))
+        # thresh = np.median(ents)+2.5*np.std(ents)
+        # flag = np.zeros_like(ents)
+        # flag[ents>thresh] = 1
+        # entfull.extend(ents)
+        # flags.extend(flag)
+        
         results.extend(20*np.log10(intermediate))
 
     if rescale:
-  
-        low = np.floor(np.percentile(results,1)) #file wise
-        high = np.ceil(np.percentile(results,99)) #filewise
+        vals = np.stack(results,axis=0)[:,128:,:]
+        print(vals.shape)
+        low = np.floor(np.percentile(vals,1)) #file wise
+        high = np.ceil(np.percentile(vals,99)) #filewise
+        del vals
         results = [(255*((r-low)/(high-low))).clip(0, 255).astype(np.uint8) for r in results]
 
-
-    outputs = [(k[0],k[1],k[2],k[3]) for k in zip(results,pos,maxs,vels)]
+    if fold:
+        results = [foldFK(r,ks) for r in results] #this folds the fk so pos and neg ks are in separate image channels
+    
+    outputs = [(k[0],k[1],k[2],k[3],k[4]) for k in zip(results,pos,maxs,vels,Ls)]
 
     return outputs
+
+
 
 
